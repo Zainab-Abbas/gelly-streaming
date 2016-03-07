@@ -30,6 +30,7 @@ import org.apache.flink.graph.streaming.SimpleEdgeStream;
 import org.apache.flink.graph.streaming.WindowGraphAggregation;
 import org.apache.flink.graph.streaming.example.util.Candidates;
 import org.apache.flink.graph.streaming.example.util.SignedVertex;
+import org.apache.flink.graph.streaming.library.BipartitenessCheck;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.NullValue;
@@ -41,7 +42,7 @@ import org.apache.flink.util.Collector;
  * groups, such as no two nodes inside the same group is connected by an edge.
  * The example uses the merge-tree abstraction of our graph streaming API.
  */
-public class BipartitenessCheck implements ProgramDescription {
+public class BipartitenessCheckExample implements ProgramDescription {
 
 	@SuppressWarnings("serial")
 	public static void main(String[] args) throws Exception {
@@ -53,24 +54,8 @@ public class BipartitenessCheck implements ProgramDescription {
 
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		GraphStream<Long, NullValue, NullValue> graph = new SimpleEdgeStream<>(getEdgesDataSet(env), env);
-		
-		EdgesFold<Long, NullValue, Candidates> updFun = new EdgesFold<Long, NullValue, Candidates>() {
-			@Override
-			public Candidates foldEdges(Candidates candidates, Long v1, Long v2, NullValue edgeVal) throws Exception {
-				return candidates.merge(edgeToCandidate(v1, v2));  
-			}
-		};
-		
-		ReduceFunction<Candidates> combineFun = new ReduceFunction<Candidates>() {
-			@Override
-			public Candidates reduce(Candidates c1, Candidates c2) throws Exception {
-				return c1.merge(c2);
-			}
-		};
-		
-		DataStream<Candidates> bipartition = graph.aggregate(
-				new WindowGraphAggregation<Long,NullValue, Candidates, Candidates>(updFun, combineFun, new Candidates(true), 500, false));
-		
+		DataStream<Candidates> bipartition = graph.aggregate
+				(new BipartitenessCheck<Long, NullValue>());
 		// Emit the results
 		if (fileOutput) {
 			bipartition.writeAsCsv(outputPath);
@@ -90,20 +75,11 @@ public class BipartitenessCheck implements ProgramDescription {
 	private static String edgeInputPath = null;
 	private static String outputPath = null;
 
-	public static Candidates edgeToCandidate(long v1, long v2) throws Exception {
-		long src = Math.min(v1, v2);
-		long trg = Math.max(v1, v2);
-		Candidates cand = new Candidates(true);
-		cand.add(src, new SignedVertex(src, true));
-		cand.add(src, new SignedVertex(trg, false));
-		return cand;
-	}
-
 	private static boolean parseParameters(String[] args) {
 
 		if(args.length > 0) {
 			if(args.length != 2) {
-				System.err.println("Usage: BipartitenessCheck <input edges path> <output path>");
+				System.err.println("Usage: BipartitenessCheckExample <input edges path> <output path>");
 				return false;
 			}
 
@@ -111,10 +87,10 @@ public class BipartitenessCheck implements ProgramDescription {
 			edgeInputPath = args[0];
 			outputPath = args[1];
 		} else {
-			System.out.println("Executing BipartitenessCheck example with default parameters and built-in default data.");
+			System.out.println("Executing BipartitenessCheckExample example with default parameters and built-in default data.");
 			System.out.println("  Provide parameters to read input data from files.");
 			System.out.println("  See the documentation for the correct format of input files.");
-			System.out.println("  Usage: BipartitenessCheck <input edges path> <output path>");
+			System.out.println("  Usage: BipartitenessCheckExample <input edges path> <output path>");
 		}
 		return true;
 	}

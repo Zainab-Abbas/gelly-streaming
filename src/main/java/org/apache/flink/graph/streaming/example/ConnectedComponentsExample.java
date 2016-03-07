@@ -32,6 +32,7 @@ import org.apache.flink.graph.streaming.GraphStream;
 import org.apache.flink.graph.streaming.SimpleEdgeStream;
 import org.apache.flink.graph.streaming.WindowGraphAggregation;
 import org.apache.flink.graph.streaming.example.util.DisjointSet;
+import org.apache.flink.graph.streaming.library.ConnectedComponents;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.AscendingTimestampExtractor;
@@ -47,7 +48,7 @@ import org.apache.flink.util.Collector;
  * This is a single-pass implementation, which uses a {@link WindowGraphAggregation} to periodically merge
  * the partitioned state. For an iterative implementation, see {@link IterativeConnectedComponents}.
  */
-public class ConnectedComponents implements ProgramDescription {
+public class ConnectedComponentsExample implements ProgramDescription {
 
 	public static void main(String[] args) throws Exception {
 
@@ -59,9 +60,7 @@ public class ConnectedComponents implements ProgramDescription {
 
         GraphStream<Long, NullValue, NullValue> edges = getGraphStream(env);
 
-        DataStream<DisjointSet<Long>> cc = edges.aggregate(
-                new WindowGraphAggregation<Long, NullValue, DisjointSet<Long>, DisjointSet<Long>>(
-                        new UpdateCC(), new CombineCC(), new DisjointSet<Long>(), mergeWindowTime, false));
+        DataStream<DisjointSet<Long>> cc = edges.aggregate(new ConnectedComponents<Long, NullValue>(mergeWindowTime));
 
         // flatten the elements of the disjoint set and print
         // in windows of printWindowTime
@@ -70,32 +69,6 @@ public class ConnectedComponents implements ProgramDescription {
         	.fold(new Tuple2<Long, Long>(0l, 0l), new IdentityFold()).print();
 
         env.execute("Streaming Connected Components");
-    }
-
-    @SuppressWarnings("serial")
-    public static class UpdateCC implements EdgesFold<Long, NullValue, DisjointSet<Long>> {
-
-		@Override
-		public DisjointSet<Long> foldEdges(DisjointSet<Long> ds, Long vertex, Long vertex2, NullValue edgeValue) throws Exception {
-			ds.union(vertex,vertex2);
-			return ds;
-		}
-	}
-
-    @SuppressWarnings("serial")
-    private static class CombineCC implements ReduceFunction<DisjointSet<Long>> {
-        @Override
-        public DisjointSet<Long> reduce(DisjointSet<Long> s1, DisjointSet<Long> s2) throws Exception {
-            int count1 = s1.getMatches().size();
-            int count2 = s2.getMatches().size();
-            if (count1 <= count2) {
-                s2.merge(s1);
-                return s2;
-            }
-
-            s1.merge(s2);
-            return s1;
-        }
     }
 
     // *************************************************************************
@@ -111,7 +84,7 @@ public class ConnectedComponents implements ProgramDescription {
 
 		if(args.length > 0) {
 			if(args.length != 3) {
-				System.err.println("Usage: ConnectedComponents <input edges path> <merge window time (ms)> "
+				System.err.println("Usage: ConnectedComponentsExample <input edges path> <merge window time (ms)> "
 						+ "print window time (ms)");
 				return false;
 			}
@@ -121,10 +94,10 @@ public class ConnectedComponents implements ProgramDescription {
 			mergeWindowTime = Long.parseLong(args[1]);
 			printWindowTime = Long.parseLong(args[2]);
 		} else {
-			System.out.println("Executing ConnectedComponents example with default parameters and built-in default data.");
+			System.out.println("Executing ConnectedComponentsExample example with default parameters and built-in default data.");
 			System.out.println("  Provide parameters to read input data from files.");
 			System.out.println("  See the documentation for the correct format of input files.");
-			System.out.println("  Usage: ConnectedComponents <input edges path> <merge window time (ms)> "
+			System.out.println("  Usage: ConnectedComponentsExample <input edges path> <merge window time (ms)> "
 					+ "print window time (ms)");
 		}
 		return true;
