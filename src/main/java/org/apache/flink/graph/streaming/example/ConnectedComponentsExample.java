@@ -18,16 +18,12 @@
 
 package org.apache.flink.graph.streaming.example;
 
-import java.util.concurrent.TimeUnit;
-
 import org.apache.flink.api.common.ProgramDescription;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.FoldFunction;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.graph.Edge;
-import org.apache.flink.graph.streaming.EdgesFold;
 import org.apache.flink.graph.streaming.GraphStream;
 import org.apache.flink.graph.streaming.SimpleEdgeStream;
 import org.apache.flink.graph.streaming.WindowGraphAggregation;
@@ -39,6 +35,8 @@ import org.apache.flink.streaming.api.functions.AscendingTimestampExtractor;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.types.NullValue;
 import org.apache.flink.util.Collector;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * The Connected Components algorithm assigns a component ID to each vertex in the graph.
@@ -52,28 +50,28 @@ public class ConnectedComponentsExample implements ProgramDescription {
 
 	public static void main(String[] args) throws Exception {
 
-		if(!parseParameters(args)) {
+		if (!parseParameters(args)) {
 			return;
 		}
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        GraphStream<Long, NullValue, NullValue> edges = getGraphStream(env);
+		GraphStream<Long, NullValue, NullValue> edges = getGraphStream(env);
 
-        DataStream<DisjointSet<Long>> cc = edges.aggregate(new ConnectedComponents<Long, NullValue>(mergeWindowTime));
+		DataStream<DisjointSet<Long>> cc = edges.aggregate(new ConnectedComponents<Long, NullValue>(mergeWindowTime));
 
-        // flatten the elements of the disjoint set and print
-        // in windows of printWindowTime
-        cc.flatMap(new FlattenSet()).keyBy(0)
-        	.timeWindow(Time.of(printWindowTime, TimeUnit.MILLISECONDS))
-        	.fold(new Tuple2<Long, Long>(0l, 0l), new IdentityFold()).print();
+		// flatten the elements of the disjoint set and print
+		// in windows of printWindowTime
+		cc.flatMap(new FlattenSet()).keyBy(0)
+				.timeWindow(Time.of(printWindowTime, TimeUnit.MILLISECONDS))
+				.fold(new Tuple2<Long, Long>(0l, 0l), new IdentityFold()).print();
 
-        env.execute("Streaming Connected Components");
-    }
+		env.execute("Streaming Connected Components");
+	}
 
-    // *************************************************************************
-    //     UTIL METHODS
-    // *************************************************************************
+	// *************************************************************************
+	//     UTIL METHODS
+	// *************************************************************************
 
 	private static boolean fileOutput = false;
 	private static String edgeInputPath = null;
@@ -82,8 +80,8 @@ public class ConnectedComponentsExample implements ProgramDescription {
 
 	private static boolean parseParameters(String[] args) {
 
-		if(args.length > 0) {
-			if(args.length != 3) {
+		if (args.length > 0) {
+			if (args.length != 3) {
 				System.err.println("Usage: ConnectedComponentsExample <input edges path> <merge window time (ms)> "
 						+ "print window time (ms)");
 				return false;
@@ -104,10 +102,10 @@ public class ConnectedComponentsExample implements ProgramDescription {
 	}
 
 
-    @SuppressWarnings("serial")
+	@SuppressWarnings("serial")
 	private static GraphStream<Long, NullValue, NullValue> getGraphStream(StreamExecutionEnvironment env) {
 
-    	if (fileOutput) {
+		if (fileOutput) {
 			return new SimpleEdgeStream<Long, NullValue>(env.readTextFile(edgeInputPath)
 					.map(new MapFunction<String, Edge<Long, NullValue>>() {
 						@Override
@@ -120,52 +118,52 @@ public class ConnectedComponentsExample implements ProgramDescription {
 					}), env);
 		}
 
-        return new SimpleEdgeStream<>(env.generateSequence(1, 100).flatMap(
-                new FlatMapFunction<Long, Edge<Long, Long>>() {
-                    @Override
-                    public void flatMap(Long key, Collector<Edge<Long, Long>> out) throws Exception {
-                        out.collect(new Edge<>(key, key + 2, key * 100));
-                    }
-                }),
-                new AscendingTimestampExtractor<Edge<Long, Long>>() {
-                    @Override
-                    public long extractAscendingTimestamp(Edge<Long, Long> element, long currentTimestamp) {
-                        return element.getValue();
-                    }
-                }, env).mapEdges(new MapFunction<Edge<Long,Long>, NullValue>() {
+		return new SimpleEdgeStream<>(env.generateSequence(1, 100).flatMap(
+				new FlatMapFunction<Long, Edge<Long, Long>>() {
 					@Override
-					public NullValue map(Edge<Long, Long> edge) {
-						return NullValue.getInstance();
+					public void flatMap(Long key, Collector<Edge<Long, Long>> out) throws Exception {
+						out.collect(new Edge<>(key, key + 2, key * 100));
 					}
-				});
-    }
+				}),
+				new AscendingTimestampExtractor<Edge<Long, Long>>() {
+					@Override
+					public long extractAscendingTimestamp(Edge<Long, Long> element, long currentTimestamp) {
+						return element.getValue();
+					}
+				}, env).mapEdges(new MapFunction<Edge<Long, Long>, NullValue>() {
+			@Override
+			public NullValue map(Edge<Long, Long> edge) {
+				return NullValue.getInstance();
+			}
+		});
+	}
 
-    @SuppressWarnings("serial")
+	@SuppressWarnings("serial")
 	public static final class FlattenSet implements FlatMapFunction<DisjointSet<Long>, Tuple2<Long, Long>> {
 
-    	private Tuple2<Long, Long> t = new Tuple2<>();
+		private Tuple2<Long, Long> t = new Tuple2<>();
 
 		@Override
 		public void flatMap(DisjointSet<Long> set, Collector<Tuple2<Long, Long>> out) {
 			for (Long vertex : set.getMatches().keySet()) {
-	            Long parent = set.find(vertex);
-	            t.setField(vertex, 0);
-	            t.setField(parent, 1);
-	            out.collect(t);
+				Long parent = set.find(vertex);
+				t.setField(vertex, 0);
+				t.setField(parent, 1);
+				out.collect(t);
 			}
 		}
 	}
 
-    @SuppressWarnings("serial")
+	@SuppressWarnings("serial")
 	public static final class IdentityFold implements FoldFunction<Tuple2<Long, Long>, Tuple2<Long, Long>> {
 		public Tuple2<Long, Long> fold(Tuple2<Long, Long> accumulator,
-				Tuple2<Long, Long> value) throws Exception {
+									   Tuple2<Long, Long> value) throws Exception {
 			return value;
 		}
-    }
+	}
 
-    @Override
-    public String getDescription() {
-        return "Streaming Connected Components on Global Aggregation";
-    }
+	@Override
+	public String getDescription() {
+		return "Streaming Connected Components on Global Aggregation";
+	}
 }

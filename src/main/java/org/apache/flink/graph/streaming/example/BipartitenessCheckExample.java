@@ -20,16 +20,11 @@ package org.apache.flink.graph.streaming.example;
 
 import org.apache.flink.api.common.ProgramDescription;
 import org.apache.flink.api.common.functions.FlatMapFunction;
-import org.apache.flink.api.common.functions.FoldFunction;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.graph.Edge;
-import org.apache.flink.graph.streaming.EdgesFold;
 import org.apache.flink.graph.streaming.GraphStream;
 import org.apache.flink.graph.streaming.SimpleEdgeStream;
-import org.apache.flink.graph.streaming.WindowGraphAggregation;
 import org.apache.flink.graph.streaming.example.util.Candidates;
-import org.apache.flink.graph.streaming.example.util.SignedVertex;
 import org.apache.flink.graph.streaming.library.BipartitenessCheck;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -48,14 +43,14 @@ public class BipartitenessCheckExample implements ProgramDescription {
 	public static void main(String[] args) throws Exception {
 
 		// Set up the environment
-		if(!parseParameters(args)) {
+		if (!parseParameters(args)) {
 			return;
 		}
 
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		GraphStream<Long, NullValue, NullValue> graph = new SimpleEdgeStream<>(getEdgesDataSet(env), env);
 		DataStream<Candidates> bipartition = graph.aggregate
-				(new BipartitenessCheck<Long, NullValue>());
+				(new BipartitenessCheck<Long, NullValue>((long) 500));
 		// Emit the results
 		if (fileOutput) {
 			bipartition.writeAsCsv(outputPath);
@@ -77,8 +72,8 @@ public class BipartitenessCheckExample implements ProgramDescription {
 
 	private static boolean parseParameters(String[] args) {
 
-		if(args.length > 0) {
-			if(args.length != 2) {
+		if (args.length > 0) {
+			if (args.length != 2) {
 				System.err.println("Usage: BipartitenessCheckExample <input edges path> <output path>");
 				return false;
 			}
