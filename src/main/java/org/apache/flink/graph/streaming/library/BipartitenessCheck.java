@@ -29,10 +29,10 @@ import org.apache.flink.types.NullValue;
 import java.io.Serializable;
 
 /**
- * The bipartiteness check library to check whether an input graph is bipartite
+ * The bipartiteness check library method checks whether an input graph is bipartite
  * or not. A bipartite graph's vertices can be separated into two disjoint
- * groups, such as no two nodes inside the same group is connected by an edge.
- * The library uses the merge-tree abstraction of our graph streaming API.
+ * groups, such as no two nodes inside the same group are connected by an edge.
+ * The library uses the Window Graph Aggregation class of our graph streaming API.
  *
  * @param <K>  the vertex ID type
  * @param <EV> the edge value type
@@ -41,6 +41,12 @@ public class BipartitenessCheck<K extends Serializable, EV> extends WindowGraphA
 
 	private long mergeWindowTime;
 
+	/**
+	 * Creates a BipartitenessCheck object using WindowGraphAggregation class.
+	 * This helps dividing the edge stream into parallel window for each partition.
+	 *
+	 * @param mergeWindowTime Window time in millisec for the merger.
+	 */
 	public BipartitenessCheck(long mergeWindowTime) {
 		super(new updateFunction(), new combineFunction(), new Candidates(true), mergeWindowTime, false);
 	}
@@ -57,17 +63,17 @@ public class BipartitenessCheck<K extends Serializable, EV> extends WindowGraphA
 	@SuppressWarnings("serial")
 
 	/**
-	 * Implements EdgesFold Interface, applies a function to a vertex neighborhood
-	 * in the {@link GraphWindowStream#foldNeighbors(Object, EdgesFold)} method.
+	 * Implements the EdgesFold Interface, applies foldEdges function to
+	 * a vertex neighborhood
 	 *
 	 * @param <K> the vertex ID type
 	 */
 	public static class updateFunction<K extends Serializable> implements EdgesFold<Long, NullValue, Candidates> {
 
 		/**
-		 * Combines two edge values into one value of the same type.
-		 * The foldEdges function is consecutively applied to all edges of a neighborhood,
-		 * until only a single value remains.
+		 * Implements foldEdges method of EdgesFold interface for combining
+		 * two edges values into same type using merge method of the Candidates class.
+		 * In this case it updates the Bipartiteness value in each partition.
 		 *
 		 * @param candidates the initial value and accumulator
 		 * @param v1         the vertex ID
@@ -83,31 +89,17 @@ public class BipartitenessCheck<K extends Serializable, EV> extends WindowGraphA
 	}
 
 	/**
-	 * Reduce functions combine groups of elements to
-	 * a single value, by taking always two elements and combining them into one. Reduce functions
-	 * may be used on entire data sets, or on grouped data sets. In the latter case, each group is reduced
-	 * individually.
-	 * <p>
-	 * For a reduce functions that work on an entire group at the same time (such as the
-	 * MapReduce/Hadoop-style reduce), see {@link GroupReduceFunction}. In the general case,
-	 * ReduceFunctions are considered faster, because they allow the system to use more efficient
-	 * execution strategies.
-	 * <p>
-	 * The basic syntax for using a grouped ReduceFunction is as follows:
-	 * <pre>{@code
-	 * DataSet<X> input = ...;
-	 *
-	 * DataSet<X> result = input.groupBy(<key-definition>).reduce(new MyReduceFunction());
-	 * }</pre>
-	 * <p>
-	 * <p>
-	 * Like all functions, the ReduceFunction needs to be serializable, as defined in {@link java.io.Serializable}.
+	 * Implements the ReduceFunction Interface, applies reduce function to
+	 * combine group of elements into a single value.
 	 */
 	public static class combineFunction implements ReduceFunction<Candidates> {
 
 		/**
-		 * The core method of ReduceFunction, combining two values into one value of the same type.
-		 * The reduce function is consecutively applied to all values of a group until only a single value remains.
+		 * Implements reduce method of ReduceFunction interface.
+		 * Two values of Candidates class are combined into one using merge method
+		 * of the Candidate class.
+		 * In this case the merge method takes Bipartiteness values from different
+		 * partitions and merges them into one.
 		 *
 		 * @param c1 The first value to combine.
 		 * @param c2 The second value to combine.

@@ -30,7 +30,7 @@ import org.apache.flink.types.NullValue;
 import java.io.Serializable;
 
 /**
- * The Connected Components algorithm assigns a component ID to each vertex in the graph.
+ * The Connected Components library method assigns a component ID to each vertex in the graph.
  * Vertices that belong to the same component have the same component ID.
  * This algorithm computes _weakly_ connected components, i.e. edge direction is ignored.
  * <p>
@@ -44,22 +44,28 @@ public class ConnectedComponents<K extends Serializable, EV> extends WindowGraph
 
 	private long mergeWindowTime;
 
+	/**
+	 * Creates a ConnectedComponents object using WindowGraphAggregation class.
+	 * This helps dividing the edge stream into parallel window for each partition.
+	 *
+	 * @param mergeWindowTime Window time in millisec for the merger.
+	 */
 	public ConnectedComponents(long mergeWindowTime) {
 		super(new UpdateCC(), new CombineCC(), new DisjointSet<K>(), mergeWindowTime, false);
 	}
 
 	/**
-	 * Implements EdgesFold Interface, applies a function to a vertex neighborhood
-	 * in the {@link GraphWindowStream#foldNeighbors(Object, EdgesFold)} method.
+	 * Implements EdgesFold Interface, applies foldEdges function to
+	 * a vertex neighborhood
 	 *
 	 * @param <K> the vertex ID type
 	 */
 	public final static class UpdateCC<K extends Serializable> implements EdgesFold<K, NullValue, DisjointSet<K>> {
 
 		/**
-		 * Combines two edge values into one value of the same type.
-		 * The foldEdges function is consecutively applied to all edges of a neighborhood,
-		 * until only a single value remains.
+		 * Implements foldEdges method of EdgesFold interface for combining
+		 * two edges values into same type using union method of the DisjointSet class.
+		 * In this case it updates the Connected Component value in each partition.
 		 *
 		 * @param ds        the initial value and accumulator
 		 * @param vertex    the vertex ID
@@ -76,30 +82,17 @@ public class ConnectedComponents<K extends Serializable, EV> extends WindowGraph
 	}
 
 	/**
-	 * Reduce functions combine groups of elements to
-	 * a single value, by taking always two elements and combining them into one. Reduce functions
-	 * may be used on entire data sets, or on grouped data sets. In the latter case, each group is reduced
-	 * individually.
-	 * <p>
-	 * For a reduce functions that work on an entire group at the same time (such as the
-	 * MapReduce/Hadoop-style reduce), see {@link GroupReduceFunction}. In the general case,
-	 * ReduceFunctions are considered faster, because they allow the system to use more efficient
-	 * execution strategies.
-	 * <p>
-	 * The basic syntax for using a grouped ReduceFunction is as follows:
-	 * <pre>{@code
-	 * DataSet<X> input = ...;
-	 *
-	 * DataSet<X> result = input.groupBy(<key-definition>).reduce(new MyReduceFunction());
-	 * }</pre>
-	 * <p>
-	 * Like all functions, the ReduceFunction needs to be serializable, as defined in {@link java.io.Serializable}.
+	 * Implements the ReduceFunction Interface, applies reduce function to
+	 * combine group of elements into a single value.
 	 */
 	public static class CombineCC<K extends Serializable> implements ReduceFunction<DisjointSet<K>> {
 
 		/**
-		 * The core method of ReduceFunction, combining two values into one value of the same type.
-		 * The reduce function is consecutively applied to all values of a group until only a single value remains.
+		 * Implements reduce method of ReduceFunction interface.
+		 * Two values of DisjointSet class are combined into one using merge method
+		 * of the DisjointSet class.
+		 * In this case the merge method takes Connected Components values from different
+		 * partitions and merges them into one.
 		 *
 		 * @param s1 The first value to combine.
 		 * @param s2 The second value to combine.

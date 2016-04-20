@@ -156,8 +156,7 @@ public class ConnectedComponentsExample implements ProgramDescription {
 
 	@SuppressWarnings("serial")
 	public static final class IdentityFold implements FoldFunction<Tuple2<Long, Long>, Tuple2<Long, Long>> {
-		public Tuple2<Long, Long> fold(Tuple2<Long, Long> accumulator,
-									   Tuple2<Long, Long> value) throws Exception {
+		public Tuple2<Long, Long> fold(Tuple2<Long, Long> accumulator, Tuple2<Long, Long> value) throws Exception {
 			return value;
 		}
 	}
