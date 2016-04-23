@@ -29,7 +29,7 @@ import org.apache.flink.types.NullValue;
 import java.io.Serializable;
 
 /**
- * The bipartiteness check library method checks whether an input graph is bipartite
+ * The Bipartiteness check library method checks whether an input graph is bipartite
  * or not. A bipartite graph's vertices can be separated into two disjoint
  * groups, such as no two nodes inside the same group are connected by an edge.
  * The library uses the Window Graph Aggregation class of our graph streaming API.
@@ -43,7 +43,10 @@ public class BipartitenessCheck<K extends Serializable, EV> extends WindowGraphA
 
 	/**
 	 * Creates a BipartitenessCheck object using WindowGraphAggregation class.
-	 * This helps dividing the edge stream into parallel window for each partition.
+	 * To perform the Bipartiteness check the BipartitenessCheck object is passed as an argument
+	 * to the aggregate function of the {@link org.apache.flink.graph.streaming.GraphStream} class.
+	 * Creating the Bipartiteness object sets the EdgeFold, ReduceFunction, Initial Value,
+	 * MergeWindow Time and Transient State for using the Window Graph Aggregation class.
 	 *
 	 * @param mergeWindowTime Window time in millisec for the merger.
 	 */
@@ -64,7 +67,10 @@ public class BipartitenessCheck<K extends Serializable, EV> extends WindowGraphA
 
 	/**
 	 * Implements the EdgesFold Interface, applies foldEdges function to
-	 * a vertex neighborhood
+	 * a vertex neighborhood.
+	 * The Edge stream is divided into different windows, the foldEdges function
+	 * is applied on each window incrementally and the aggregate state for each window
+	 * is updated, in this case it checks the edges in a window are Bipartite or not.
 	 *
 	 * @param <K> the vertex ID type
 	 */
@@ -73,7 +79,11 @@ public class BipartitenessCheck<K extends Serializable, EV> extends WindowGraphA
 		/**
 		 * Implements foldEdges method of EdgesFold interface for combining
 		 * two edges values into same type using merge method of the Candidates class.
-		 * In this case it updates the Bipartiteness value in each partition.
+		 * In this case it checks the Bipartiteness of the edges in a partition by
+		 * separating vertices into two groups such that there is no edge between the
+		 * vertices of the same group.
+		 * In case the sub-graph is Bipartite it assigns true value to the candidate object's field,
+		 * otherwise false.
 		 *
 		 * @param candidates the initial value and accumulator
 		 * @param v1         the vertex ID
@@ -91,6 +101,12 @@ public class BipartitenessCheck<K extends Serializable, EV> extends WindowGraphA
 	/**
 	 * Implements the ReduceFunction Interface, applies reduce function to
 	 * combine group of elements into a single value.
+	 * The aggregated states from different windows are combined together
+	 * and reduced to a single result.
+	 * In this case the Bipartiteness state of sub-graphs in each window is checked
+	 * and their aggregate states are merged to check if the whole graph is Bipartite or
+	 * not.
+	 *
 	 */
 	public static class combineFunction implements ReduceFunction<Candidates> {
 
@@ -98,8 +114,12 @@ public class BipartitenessCheck<K extends Serializable, EV> extends WindowGraphA
 		 * Implements reduce method of ReduceFunction interface.
 		 * Two values of Candidates class are combined into one using merge method
 		 * of the Candidate class.
-		 * In this case the merge method takes Bipartiteness values from different
-		 * partitions and merges them into one.
+		 * In this case the merge method checks Bipartiteness state i.e true or false
+		 * from all windows and merges the aggregate results together to check
+		 * if all of vertices can be divided into two groups so that there in no edge between
+		 * two vertices of the same group.
+		 * In-case two such groups exist it assigns true value to the candidate object's field
+		 * declaring the graph as Bipartite.
 		 *
 		 * @param c1 The first value to combine.
 		 * @param c2 The second value to combine.
