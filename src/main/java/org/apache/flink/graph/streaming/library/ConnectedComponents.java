@@ -46,7 +46,10 @@ public class ConnectedComponents<K extends Serializable, EV> extends WindowGraph
 
 	/**
 	 * Creates a ConnectedComponents object using WindowGraphAggregation class.
-	 * This helps dividing the edge stream into parallel window for each partition.
+	 * To find number of Connected Components the ConnectedComponents object is passed as an argument
+	 * to the aggregate function of the {@link org.apache.flink.graph.streaming.GraphStream} class.
+	 * Creating the ConnectedComponents object sets the EdgeFold, ReduceFunction, Initial Value,
+	 * MergeWindow Time and Transient State for using the Window Graph Aggregation class.
 	 *
 	 * @param mergeWindowTime Window time in millisec for the merger.
 	 */
@@ -57,6 +60,9 @@ public class ConnectedComponents<K extends Serializable, EV> extends WindowGraph
 	/**
 	 * Implements EdgesFold Interface, applies foldEdges function to
 	 * a vertex neighborhood
+	 * The Edge stream is divided into different windows, the foldEdges function
+	 * is applied on each window incrementally and the aggregate state for each window
+	 * is updated, in this case it checks the connected components in a window.
 	 *
 	 * @param <K> the vertex ID type
 	 */
@@ -65,7 +71,9 @@ public class ConnectedComponents<K extends Serializable, EV> extends WindowGraph
 		/**
 		 * Implements foldEdges method of EdgesFold interface for combining
 		 * two edges values into same type using union method of the DisjointSet class.
-		 * In this case it updates the Connected Component value in each partition.
+		 * In this case it computes the connected components in a partition by
+		 * by checking which vertices are connected checking their edges, all the connected
+		 * vertices are assigned the same component ID.
 		 *
 		 * @param ds        the initial value and accumulator
 		 * @param vertex    the vertex ID
@@ -84,6 +92,10 @@ public class ConnectedComponents<K extends Serializable, EV> extends WindowGraph
 	/**
 	 * Implements the ReduceFunction Interface, applies reduce function to
 	 * combine group of elements into a single value.
+	 * The aggregated states from different windows are combined together
+	 * and reduced to a single result.
+	 * In this case the values of the vertices belonging to Connected Components form
+	 * each window are merged to find the Connected Components for the whole graph.
 	 */
 	public static class CombineCC<K extends Serializable> implements ReduceFunction<DisjointSet<K>> {
 
@@ -91,8 +103,11 @@ public class ConnectedComponents<K extends Serializable, EV> extends WindowGraph
 		 * Implements reduce method of ReduceFunction interface.
 		 * Two values of DisjointSet class are combined into one using merge method
 		 * of the DisjointSet class.
-		 * In this case the merge method takes Connected Components values from different
-		 * partitions and merges them into one.
+		 * In this case the merge method takes Connected Components values that includes
+		 * the vertices values along with the Component ID they belong from different
+		 * windows and merges them to find if some Connected Components can be further
+		 * merged to find Connected Components of the whole graph.
+		 *
 		 *
 		 * @param s1 The first value to combine.
 		 * @param s2 The second value to combine.
