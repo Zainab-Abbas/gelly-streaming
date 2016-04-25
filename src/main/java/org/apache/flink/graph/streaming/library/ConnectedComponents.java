@@ -62,7 +62,8 @@ public class ConnectedComponents<K extends Serializable, EV> extends WindowGraph
 	 * a vertex neighborhood
 	 * The Edge stream is divided into different windows, the foldEdges function
 	 * is applied on each window incrementally and the aggregate state for each window
-	 * is updated, in this case it checks the connected components in a window.
+	 * is updated, in this case it checks the connected components in a window. If
+	 * there is an edge between two vertices then they become part of a connected component.
 	 *
 	 * @param <K> the vertex ID type
 	 */
@@ -105,8 +106,9 @@ public class ConnectedComponents<K extends Serializable, EV> extends WindowGraph
 		 * of the DisjointSet class.
 		 * In this case the merge method takes Connected Components values that includes
 		 * the vertices values along with the Component ID they belong from different
-		 * windows and merges them to find if some Connected Components can be further
-		 * merged to find Connected Components of the whole graph.
+		 * windows and merges them, some Connected Components can be combined if they have
+		 * some common vertex value. In the end the total Connected Components of the whole graph
+		 * along with the vertices values belonging to those components are returned.
 		 *
 		 *
 		 * @param s1 The first value to combine.
