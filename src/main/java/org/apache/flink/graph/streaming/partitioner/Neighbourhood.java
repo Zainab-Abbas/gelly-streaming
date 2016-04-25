@@ -1,7 +1,7 @@
 package org.apache.flink.graph.streaming.partitioner;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.graph.streaming.partitioner.until.Partitioner;
+import org.apache.flink.graph.streaming.partitioner.until.CustomPartitioners;
 import org.apache.flink.hadoop.shaded.com.google.common.collect.HashBasedTable;
 import org.apache.flink.hadoop.shaded.com.google.common.collect.Table;
 
@@ -36,7 +36,7 @@ public class Neighbourhood {
         E.add(new Tuple2<Long, Long>(4L, 8L));
     }
 
-    private static class Partition extends Partitioner{
+    private static class Partition extends CustomPartitioners {
 
         private final Table<Long,Long,Long> Degree =  HashBasedTable.create();   //for <partition.no, vertexId, Degree>
         private final HashMap<Long,List<Tuple2<Long,Long>>> Result = new HashMap<>();

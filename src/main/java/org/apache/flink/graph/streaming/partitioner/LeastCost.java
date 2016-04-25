@@ -1,7 +1,7 @@
 package org.apache.flink.graph.streaming.partitioner;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.graph.streaming.partitioner.until.Partitioner;
+import org.apache.flink.graph.streaming.partitioner.until.CustomPartitioners;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,7 +31,7 @@ public class LeastCost {
 		E.add(new Tuple2<Long, Long>(4L, 8L));
 	}
 
-	private static class Partition extends Partitioner {
+	private static class Partition extends CustomPartitioners {
 		private final HashMap<Long,List<Long>> vertices = new HashMap<>();  //for <partition.no, vertexId>
 		private final List<Long> load = new ArrayList<>(); //for load of each partiton
 		private final List<Long> cost = new ArrayList<>();
