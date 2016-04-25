@@ -70,7 +70,7 @@ public class BipartitenessCheck<K extends Serializable, EV> extends WindowGraphA
 	 * a vertex neighborhood.
 	 * The Edge stream is divided into different windows, the foldEdges function
 	 * is applied on each window incrementally and the aggregate state for each window
-	 * is updated, in this case it checks the edges in a window are Bipartite or not.
+	 * is updated, in this case it checks the sub-graph(stream of edges) in a window is Bipartite or not.
 	 *
 	 * @param <K> the vertex ID type
 	 */
@@ -79,7 +79,7 @@ public class BipartitenessCheck<K extends Serializable, EV> extends WindowGraphA
 		/**
 		 * Implements foldEdges method of EdgesFold interface for combining
 		 * two edges values into same type using merge method of the Candidates class.
-		 * In this case it checks the Bipartiteness of the edges in a partition by
+		 * In this case it checks the Bipartiteness of the sub-graph in a partition by
 		 * separating vertices into two groups such that there is no edge between the
 		 * vertices of the same group.
 		 * In case the sub-graph is Bipartite it assigns true value to the candidate object's field,
