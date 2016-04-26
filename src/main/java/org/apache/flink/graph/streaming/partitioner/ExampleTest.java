@@ -1,8 +1,5 @@
 package org.apache.flink.graph.streaming.partitioner;
 
-/**
- * Created by zainababbas on 25/04/16.
- */
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.core.io.IOReadableWritable;
@@ -24,16 +21,15 @@ public class ExampleTest {
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Edge<Long, NullValue>> edges = getGraphStream(env);
-		edges.partitionCustom(new test(new NeighborKeySelector(0)),new NeighborKeySelector(0)).print();
-		//edges.print();
-		//edges.writeAsCsv("/Users/zainababbas/gelly/gelly-streaming/oppppp");
-		env.execute("testing check");
+		edges.partitionCustom(new test(new SampleKeySelector(0)),new SampleKeySelector(0)).print();
+
+		env.execute("testing custom partitioner");
 		}
 
-    private static class NeighborKeySelector<K, EV> implements KeySelector<Edge<K, EV>, K> {
+    private static class SampleKeySelector<K, EV> implements KeySelector<Edge<K, EV>, K> {
 	private final int key;
 
-	public NeighborKeySelector(int k) {
+	public SampleKeySelector(int k) {
 		this.key = k;
 	}
 
