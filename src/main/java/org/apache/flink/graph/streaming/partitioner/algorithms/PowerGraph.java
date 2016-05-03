@@ -1,4 +1,4 @@
-package org.apache.flink.graph.streaming.partitioner;
+package org.apache.flink.graph.streaming.partitioner.algorithms;
 
 import org.apache.flink.graph.streaming.partitioner.until.CustomPartitioners;
 

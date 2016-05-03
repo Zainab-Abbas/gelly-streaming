@@ -1,4 +1,4 @@
-package org.apache.flink.graph.streaming.partitioner;
+package org.apache.flink.graph.streaming.partitioner.algorithms;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.graph.streaming.partitioner.until.CustomPartitioners;
@@ -24,11 +24,11 @@ public class LeastCost {
 
 	private static void getEdges(List<Tuple2<Long, Long>> E) {
 		E.add(new Tuple2<Long, Long>(1L, 2L));
-		E.add(new Tuple2<Long, Long>(2L, 4L));
-		E.add(new Tuple2<Long, Long>(5L, 6L));
-		E.add(new Tuple2<Long, Long>(7L, 8L));
-		E.add(new Tuple2<Long, Long>(4L, 7L));
-		E.add(new Tuple2<Long, Long>(4L, 8L));
+		E.add(new Tuple2<Long, Long>(1L, 3L));
+		E.add(new Tuple2<Long, Long>(1L, 5L));
+		E.add(new Tuple2<Long, Long>(2L, 3L));
+		E.add(new Tuple2<Long, Long>(6L, 7L));
+		E.add(new Tuple2<Long, Long>(8L, 9L));
 	}
 
 	private static class Partition extends CustomPartitioners {

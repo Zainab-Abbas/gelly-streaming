@@ -1,4 +1,4 @@
-package org.apache.flink.graph.streaming.partitioner;
+package org.apache.flink.graph.streaming.partitioner.algorithms;
 
 import javafx.scene.control.CustomMenuItem;
 import org.apache.flink.api.java.tuple.Tuple2;

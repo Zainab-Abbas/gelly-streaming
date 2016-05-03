@@ -1,4 +1,4 @@
-package org.apache.flink.graph.streaming.partitioner;
+package org.apache.flink.graph.streaming.partitioner.algorithms;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.graph.streaming.partitioner.until.CustomPartitioners;
@@ -43,6 +43,9 @@ public class Fennel {
 		List<Long> n5 = new ArrayList<>();
 		n5.add(0,4L);
 		V.add(new Tuple2<Long, List<Long>>(5L, n5));
+		List<Long> n6 = new ArrayList<>();
+		n5.add(0,2L);
+		V.add(new Tuple2<Long, List<Long>>(6L, n5));
 	}
 
 	private static class Partition extends CustomPartitioners {
@@ -94,7 +97,8 @@ public class Fennel {
 		}
 			Long n= Long.valueOf(Edges.size());
 			Long m= Long.valueOf(edges.size());
-			alpha= ((Math.pow(k,0.5))*m)/Math.pow(n,1.5);
+			//alpha= ((Math.pow(k,0.5))*m)/Math.pow(n,1.5);
+			alpha= ((Math.pow(k,0.5))*Math.pow(n,1.5))+m;
 		}
 
 		public void partition(List<Tuple2<Long,List<Long>>> Edges) {
@@ -115,23 +119,23 @@ public class Fennel {
 					Result.put((long) 0, L);
 				}
 				else {
-					List<Long> num = new ArrayList<>();
+					List<Double> num = new ArrayList<>();
 					int n=0;
 					for(int j=0; j<k;j++){
-						num.add(j, 0L);
+						num.add(j, 0.0);
 					}
 					for (int i = 0; i < k; i++) {
 						n=getValue(i,neighbours);
-						num.set(i, (long) (n-alpha*gamma*Math.pow(load.get(i),gamma-1)));
+						num.set(i, (double) ((double)n-alpha*gamma*Math.pow((double)load.get(i),gamma-1)));
 
 					}
 
-					Long I=0L;
+					Double I=0.0;
 					Long l=0L;
 					int index=0;
 					I=num.get(0);
 					for (int i = 1; i < k; i++) {
-                      if(I<num.get(i))
+                      if(I.compareTo(num.get(i))<0)
 					  {
 						  I=num.get(i);
 						  index=i;
