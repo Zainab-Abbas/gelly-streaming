@@ -1,8 +1,7 @@
 package org.apache.flink.graph.streaming.partitioner.algorithms;
 
-import javafx.scene.control.CustomMenuItem;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.graph.streaming.partitioner.until.CustomPartitioners;
+import org.apache.flink.graph.streaming.partitioner.algorithms.until.CustomPartitioners;
 
 import java.util.ArrayList;
 import java.util.HashMap;

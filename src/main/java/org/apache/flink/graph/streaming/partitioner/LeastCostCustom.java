@@ -114,129 +114,74 @@ public class LeastCostCustom {
 					//get the value of S(k) from each partition using return
 				}
 
-				h =CompareCost(source,target);
-				System.out.println("one");
+				h =CompareCost();
+				Long l = load.get(h);
+				l++;
+				load.set(h,l);
+				if(vertices.get((long) h)!=null)
+				{
+					List<Long> L= vertices.get((long) h);
+					if(!L.contains(source))
+					{
+					L.add(source);}
+					if(!L.contains(target))
+					{
+					L.add(target);}
+					vertices.put((long) h, L);
+				}
+				else {
+					List<Long> L = new ArrayList<>();
+					L.add(source);
+					L.add(target);
+					vertices.put((long) h, L);
+				}
 				cost.clear();
 			}
 
 			return h;
 		}
 
-		public int CompareCost(Long s, Long t) {
-			Long max = cost.get(0);
+		public int CompareCost() {
+			Long min = cost.get(0);
 			int sub = 0;
-			List<Integer> tie= new ArrayList<>();
 			for (int j = 1; j < k; j++) {
 
-				if (max < cost.get(j)) {
-					max = cost.get(j);
+				if (min > cost.get(j)) {
+					min = cost.get(j);
 					sub =j;
 				}
 
-				else if (max == cost.get(j)){
-					if(!tie.contains(sub)){
-						tie.add(sub);
-					}
-					if(!tie.contains(j)){
-						tie.add(j);
-					}
-
-				}
-			}
-
-			int position=addEdge(tie,sub,s,t);
-
-			return position;
-
-		}
-
-		public int addEdge(List<Integer> Tie, int Max, Long source, Long target){
-
-			if(!Tie.isEmpty() && Max==0L){
-				int max =  Tie.get(0);
-				int s= Tie.size();
-				int val_sub=0;
-				int val = (int) (cost.get(max)+load.get(max));
-				for(int  j =1; j<= (s-1); j++){
-
-					if(val >= (int) (cost.get(j)+load.get(j)))
+				else if (min == cost.get(j)){
+					if((cost.get(sub)+load.get(sub)) > (cost.get(j)+load.get(j)))
 					{
-						val=(int) (cost.get(j)+load.get(j));
-						val_sub=j;
-						System.out.println("Hola   1!!");
+						min = cost.get(j);
+						sub =j;
 					}
-				}
 
-				Long V1 = source ;
-				Long V2 = target;
-
-				Long l = load.get(val_sub);
-				l++;
-				load.set(val_sub,l);
-
-				if(vertices.get((long) val_sub)!=null)
-				{
-					List<Long> L= vertices.get((long) val_sub);
-					L.add(source);
-					L.add(target);
-					vertices.put((long) val_sub, L);
 				}
-				else {
-					List<Long> L = new ArrayList<>();
-					L.add(source);
-					L.add(target);
-					vertices.put((long) val_sub, L);
-				}
-				return val_sub;
 			}
-			else{
-				System.out.println("Hola   2 !!");
-				Long V1 = source;
-				Long V2 = target;
-				Long l = load.get(Max);
-				l++;
-				load.set(Max,l);
-				if(vertices.get((long) Max)!=null)
-				{
-					List<Long> L= vertices.get((long) Max);
-					L.add(source);
-					L.add(target);
-					vertices.put((long) Max, L);
-				}
-				else {
-					List<Long> L = new ArrayList<>();
-					L.add(source);
-					L.add(target);
-					vertices.put((long) Max, L);
-				}
-
-				return Max;
-			}
-
+			return sub;
 		}
+
 		public int getValue(Long source,Long target, int p) {
 			int i = 0;
-			Long V1 = source;
-			Long V2 = target;
-			List<Long> L = new ArrayList<>();
+			List<Long> L;
 			L = vertices.get((long) p);
 			if (L != null) {
-				if (L.contains((long) V1) && L.contains((long) V2)) {
-
-					System.out.println("one");
-					i = 2;
-				} else if (L.contains((long) V1) && !L.contains((long) V2)) {
-
-					System.out.println("one");
+				if (L.contains(source) && L.contains(target)) {
+					i = 0;
+				} else if (L.contains(source) && !L.contains(target)) {
 					i = 1;
-				} else if (!L.contains((long) V1) && L.contains((long) V2)) {
-					System.out.println("one");
+				} else if (!L.contains(source) && L.contains(target)) {
 					i = 1;
 				} else {
-					i = 0;
+					i = 2;
 				}
-
-			}return i;
+			}
+				else{
+					i=2;
+				}
+			return i;
 		}
 
 

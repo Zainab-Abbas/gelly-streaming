@@ -40,24 +40,24 @@ public class FennelCustom {
 		List<Tuple2<Long, List<Long>>> vertices = new ArrayList<>();
 		List<Long> n1 = new ArrayList<>();
 		n1.add(4L);
-		vertices.add(new Tuple2<Long, List<Long>>(1L, n1));
+		vertices.add(new Tuple2<>(1L, n1));
 		List<Long> n2 = new ArrayList<>();
 		n2.add(0, 3L);
 		n2.add(0, 6L);
-		vertices.add(new Tuple2<Long, List<Long>>(2L, n2));
+		vertices.add(new Tuple2<>(2L, n2));
 		List<Long> n3 = new ArrayList<>();
 		n3.add(0, 2L);
-		vertices.add(new Tuple2<Long, List<Long>>(3L, n3));
+		vertices.add(new Tuple2<>(3L, n3));
 		List<Long> n4 = new ArrayList<>();
 		n4.add(0, 1L);
 		n4.add(1, 5L);
-		vertices.add(new Tuple2<Long, List<Long>>(4L, n4));
+		vertices.add(new Tuple2<>(4L, n4));
 		List<Long> n5 = new ArrayList<>();
 		n5.add(0, 4L);
-		vertices.add(new Tuple2<Long, List<Long>>(5L, n5));
+		vertices.add(new Tuple2<>(5L, n5));
 		List<Long> n6 = new ArrayList<>();
 		n6.add(0, 2L);
-		vertices.add(new Tuple2<Long, List<Long>>(6L, n6));
+		vertices.add(new Tuple2<>(6L, n6));
 		return vertices;
 	}
 
@@ -167,7 +167,7 @@ public class FennelCustom {
 					L.add(source);
 					Result.put((long) index1, L);
 				} else {
-					List<Long> L = new ArrayList<>();
+					List<Long> L;
 					L = Result.get((long) index1);
 					L.add(source);
 					Result.put((long) index1, L);
@@ -179,7 +179,7 @@ public class FennelCustom {
 		public int getValue(int p, List<Long> n) {
 
 			int ne = 0;
-			List<Long> list = new ArrayList<>();
+			List<Long> list;
 			for (int i = 0; i < n.size(); i++) {
 				Long v = n.get(i);
 				list = Result.get((long) p);

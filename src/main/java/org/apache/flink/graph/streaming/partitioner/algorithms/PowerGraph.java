@@ -1,6 +1,6 @@
 package org.apache.flink.graph.streaming.partitioner.algorithms;
 
-import org.apache.flink.graph.streaming.partitioner.until.CustomPartitioners;
+import org.apache.flink.graph.streaming.partitioner.algorithms.until.CustomPartitioners;
 
 import java.util.ArrayList;
 import java.util.HashMap;

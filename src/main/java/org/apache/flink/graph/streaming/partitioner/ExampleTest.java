@@ -1,5 +1,6 @@
 package org.apache.flink.graph.streaming.partitioner;
 
+import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -14,14 +15,18 @@ import org.apache.flink.graph.streaming.library.BipartitenessCheck;
 import org.apache.flink.graph.streaming.library.ConnectedComponents;
 import org.apache.flink.runtime.plugable.SerializationDelegate;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.runtime.partitioner.BroadcastPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.types.NullValue;
+import org.apache.flink.util.Collector;
+import scala.collection.parallel.ParIterableLike;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -31,17 +36,25 @@ public class ExampleTest {
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Edge<Long, NullValue>> edges = getGraphStream(env);
+		SingleOutputStreamOperator g = edges.flatMap(new FlatMapFunction<Edge<Long,NullValue>, Long>() {
+			@Override
+			public void flatMap(Edge<Long, NullValue> value, Collector<Long> out) throws Exception {
+				 out.collect(value.getTarget());
+				out.close();
+			}
 
+		});
+g.print();
 		//edges.partitionCustom(new test(new SampleKeySelector(0)),new SampleKeySelector(0)).print();
-		GraphStream<Long, NullValue, NullValue> graph = new SimpleEdgeStream<>(edges.partitionCustom(new test(new SampleKeySelector(0)),new SampleKeySelector(0)), env);
-		DataStream<DisjointSet<Long>> cc = graph.aggregate(new ConnectedComponents<Long, NullValue>(5000));
-        cc.print();
-
-		DataStream<Edge<Long, NullValue>> edges2 = getGraphStream(env);
+//		GraphStream<Long, NullValue, NullValue> graph = new SimpleEdgeStream<>(edges.partitionCustom(new test(new SampleKeySelector(0)),new SampleKeySelector(0)), env);
+//		DataStream<DisjointSet<Long>> cc = graph.aggregate(new ConnectedComponents<Long, NullValue>(5000));
+ //       cc.print();
+//
+//		DataStream<Edge<Long, NullValue>> edges2 = getGraphStream(env);
 		//edges.partitionCustom(new test(new SampleKeySelector(0)),new SampleKeySelector(0)).print();
-		GraphStream<Long, NullValue, NullValue> graph2 = new SimpleEdgeStream<>(edges2, env);
-		DataStream<DisjointSet<Long>> cc2 = graph.aggregate(new ConnectedComponents<Long, NullValue>(5000));
-		cc2.print();
+//		GraphStream<Long, NullValue, NullValue> graph2 = new SimpleEdgeStream<>(edges2, env);
+//		DataStream<DisjointSet<Long>> cc2 = graph.aggregate(new ConnectedComponents<Long, NullValue>(5000));
+//		cc2.print();
 		/*cc.flatMap(new WindowTriangles.FlattenSet()).keyBy(0)
 				.timeWindow(Time.of(2000, TimeUnit.MILLISECONDS))
 				.fold(new Tuple2<Long, Long>(0l, 0l), new WindowTriangles.IdentityFold()).print();*/

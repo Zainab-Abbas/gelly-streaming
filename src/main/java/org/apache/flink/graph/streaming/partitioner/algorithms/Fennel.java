@@ -1,7 +1,7 @@
 package org.apache.flink.graph.streaming.partitioner.algorithms;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.graph.streaming.partitioner.until.CustomPartitioners;
+import org.apache.flink.graph.streaming.partitioner.algorithms.until.CustomPartitioners;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,32 +32,33 @@ public class Fennel {
 		V.add(new Tuple2<Long, List<Long>>(1L, n1));
 		List<Long> n2 = new ArrayList<>();
 		n2.add(0,3L);
-		n2.add(1,4L);
+		n2.add(0,6L);
 		V.add(new Tuple2<Long, List<Long>>(2L, n2));
 		List<Long> n3 = new ArrayList<>();
 		n3.add(0,2L);
 		V.add(new Tuple2<Long, List<Long>>(3L, n3));
 		List<Long> n4 = new ArrayList<>();
-		n4.add(0,5L);
+		n4.add(0,1L);
+		n4.add(1,5L);
 		V.add(new Tuple2<Long, List<Long>>(4L, n4));
 		List<Long> n5 = new ArrayList<>();
 		n5.add(0,4L);
 		V.add(new Tuple2<Long, List<Long>>(5L, n5));
 		List<Long> n6 = new ArrayList<>();
-		n5.add(0,2L);
-		V.add(new Tuple2<Long, List<Long>>(6L, n5));
+		n6.add(0,2L);
+		V.add(new Tuple2<Long, List<Long>>(6L, n6));
 	}
 
 	private static class Partition extends CustomPartitioners {
 
 		private final HashMap<Long,List<Long>> Result = new HashMap<>();//partitionid, list of vertices placed
-		private final List<Long> load = new ArrayList<>(); //for load of each partiton
+		private final List<Double> load = new ArrayList<>(); //for load of each partiton
 		private Long k;  //no. of partitions
 
 		private final List<Tuple2<Long,Long>> edges=new ArrayList<>();
 		private double alpha=0;  //parameters for formula
 		private double gamma=1.5;
-
+		private double loadlimit= 0.0;     //k*v+n/n
 
 		public Partition(Long n) {
 		k=n;
@@ -92,19 +93,18 @@ public class Fennel {
 					}
 				}
 			}
-
-
 		}
 			Long n= Long.valueOf(Edges.size());
 			Long m= Long.valueOf(edges.size());
 			//alpha= ((Math.pow(k,0.5))*m)/Math.pow(n,1.5);
-			alpha= ((Math.pow(k,0.5))*Math.pow(n,1.5))+m;
+			alpha= (((Math.pow(k,0.5))*Math.pow(n,1.5))+m)/Math.pow(n,1.5);
+			loadlimit=(k*1.1+n)/k;
 		}
 
 		public void partition(List<Tuple2<Long,List<Long>>> Edges) {
 
 			for(int j=0; j<k;j++){
-				load.add(j, (long) 0);
+				load.add(j, 0.0);
 			}
 
 			Edges.stream().forEach(s -> {
@@ -113,7 +113,7 @@ public class Fennel {
 
 				if(Result.isEmpty())
 				{
-					load.set(0, (long) 1);
+					load.set(0, 1.1);
 					List<Long> L = new ArrayList<>();
 					L.add(V1);
 					Result.put((long) 0, L);
@@ -126,38 +126,37 @@ public class Fennel {
 					}
 					for (int i = 0; i < k; i++) {
 						n=getValue(i,neighbours);
-						num.set(i, (double) ((double)n-alpha*gamma*Math.pow((double)load.get(i),gamma-1)));
+						num.set(i, (double) ((double)n-alpha*gamma*Math.pow(load.get(i),gamma-1)));
 
 					}
 
-					Double I=0.0;
-					Long l=0L;
-					int index=0;
-					I=num.get(0);
+					Double first=0.0;
+					Double l=0.0;
+					int index1=0;
+					first=num.get(0);
 					for (int i = 1; i < k; i++) {
-                      if(I.compareTo(num.get(i))<0)
+                      if(first.compareTo(num.get(i))<0 && load.get(i).compareTo(loadlimit)<0)
 					  {
-						  I=num.get(i);
-						  index=i;
+
+						  first=num.get(i);
+						  index1=i;
+
 					  }
-
 					}
 
-					l=load.get(index);
-					l=l+1;
-					load.set(index, l);
-					if(Result.get((long)index) ==null)
-					{
-						List<Long> L = new ArrayList<>();
-						L.add(V1);
-						Result.put((long) index, L);
-					}
-					else{
-						List<Long> L = new ArrayList<>();
-						L=Result.get((long) index);
-						L.add(V1);
-						Result.put((long) index, L);
-					}
+					l=load.get(index1);
+						l = l + 1;
+						load.set(index1, l);
+						if (Result.get((long) index1) == null) {
+							List<Long> L = new ArrayList<>();
+							L.add(V1);
+							Result.put((long) index1, L);
+						} else {
+							List<Long> L = new ArrayList<>();
+							L = Result.get((long) index1);
+							L.add(V1);
+							Result.put((long) index1, L);
+						}
 
 				}
 			});
@@ -177,11 +176,7 @@ public class Fennel {
 					}
 				}
 			}
-
 			return ne;
 		}
-
-
 		}
-
 }
