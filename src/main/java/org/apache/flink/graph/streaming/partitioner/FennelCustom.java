@@ -7,25 +7,21 @@ package org.apache.flink.graph.streaming.partitioner;
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.graph.Edge;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.types.NullValue;
-
-import java.util.*;
-
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 
-public class FennelCustom{
+public class FennelCustom {
 
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Tuple2<Long, List<Long>>> vertices = getGraphStream(env);
 		vertices.getTransformation().getOutputType();
-		vertices.partitionCustom(new test(new SampleKeySelector(0),6,4),new SampleKeySelector(0)).print();
+		vertices.partitionCustom(new test(new SampleKeySelector(0), 6, 4), new SampleKeySelector(0)).print();
 
 		env.execute("testing custom partitioner");
 		System.out.println("lala");
@@ -33,51 +29,77 @@ public class FennelCustom{
 
 	/////key selector /////////////////
 
+	private static DataStream<Tuple2<Long, List<Long>>> getGraphStream(StreamExecutionEnvironment env) {
+		return env.fromCollection(getVertices());
+	}
+
+
+	///////code for partitioner/////////
+
+	public static final List<Tuple2<Long, List<Long>>> getVertices() {
+		List<Tuple2<Long, List<Long>>> vertices = new ArrayList<>();
+		List<Long> n1 = new ArrayList<>();
+		n1.add(4L);
+		vertices.add(new Tuple2<Long, List<Long>>(1L, n1));
+		List<Long> n2 = new ArrayList<>();
+		n2.add(0, 3L);
+		n2.add(0, 6L);
+		vertices.add(new Tuple2<Long, List<Long>>(2L, n2));
+		List<Long> n3 = new ArrayList<>();
+		n3.add(0, 2L);
+		vertices.add(new Tuple2<Long, List<Long>>(3L, n3));
+		List<Long> n4 = new ArrayList<>();
+		n4.add(0, 1L);
+		n4.add(1, 5L);
+		vertices.add(new Tuple2<Long, List<Long>>(4L, n4));
+		List<Long> n5 = new ArrayList<>();
+		n5.add(0, 4L);
+		vertices.add(new Tuple2<Long, List<Long>>(5L, n5));
+		List<Long> n6 = new ArrayList<>();
+		n6.add(0, 2L);
+		vertices.add(new Tuple2<Long, List<Long>>(6L, n6));
+		return vertices;
+	}
+
 	private static class SampleKeySelector<K, EV> implements KeySelector<Tuple2<K, List<EV>>, K> {
+		private static final HashMap<Long, List<Long>> DoubleKey = new HashMap<>();
 		private final int key;
-		private static final HashMap<Long,List<Long>> DoubleKey = new HashMap<>();
 
 		public SampleKeySelector(int k) {
 			this.key = k;
 		}
 
 		public K getKey(Tuple2<K, List<EV>> vertices) throws Exception {
-			DoubleKey.put(vertices.getField(key),vertices.getField(key+1));
+			DoubleKey.put(vertices.getField(key), vertices.getField(key + 1));
 			return vertices.getField(key);
 		}
 
-		public List<Long> getValue (Object k) throws Exception {
+		public List<Long> getValue(Object k) throws Exception {
 			return DoubleKey.get((long) k);
 		}
 	}
 
-
-	///////code for partitioner/////////
-
 	private static class test<K, EV, T> implements Partitioner<T> {
 		private static final long serialVersionUID = 1L;
-		SampleKeySelector<T, ?> keySelector;
-		private final HashMap<Long,List<Long>> Result = new HashMap<>();//partitionid, list of vertices placed
+		private final HashMap<Long, List<Long>> Result = new HashMap<>();//partitionid, list of vertices placed
 		private final List<Double> load = new ArrayList<>(); //for load of each partiton
+		private final List<Tuple2<Long, Long>> edges = new ArrayList<>();
+		SampleKeySelector<T, ?> keySelector;
 		private Long k;  //no. of partitions
+		private double alpha = 0;  //parameters for formula
+		private double gamma = 0;
+		private double loadlimit = 0.0;     //k*v+n/n
+		private int n = 0;        // no of nodes
+		private int m = 0;        //no. of vertices
 
-		private final List<Tuple2<Long,Long>> edges=new ArrayList<>();
-		private double alpha=0;  //parameters for formula
-		private double gamma=0;
-		private double loadlimit= 0.0;     //k*v+n/n
-		private int n=0;        // no of nodes
-		private int m=0;        //no. of vertices
-
-		public test(SampleKeySelector<T, ?> keySelector, int n, int m)
-		{
+		public test(SampleKeySelector<T, ?> keySelector, int n, int m) {
 			this.keySelector = keySelector;
-			this.k=(long) 4;
-			this.n=n;
-			this.m=m;
-			this.alpha= (((Math.pow(k,0.5))*Math.pow(n,1.5))+m)/Math.pow(n,1.5);
-			this.gamma=1.5;
-			this.loadlimit=(k*1.1+n)/k;;
-
+			this.k = (long) 4;
+			this.n = n;
+			this.m = m;
+			this.alpha = (((Math.pow(k, 0.5)) * Math.pow(n, 1.5)) + m) / Math.pow(n, 1.5);
+			this.gamma = 1.5;
+			this.loadlimit = (k * 1.1 + n) / k;
 		}
 
 		@Override
@@ -111,8 +133,7 @@ public class FennelCustom{
 				Result.put((long) 0, L);
 				h = 0;
 
-			}
-			else {
+			} else {
 				List<Double> num = new ArrayList<>();
 				int n = 0;
 				for (int j = 0; j < k; j++) {
@@ -120,7 +141,7 @@ public class FennelCustom{
 				}
 				for (int i = 0; i < k; i++) {
 					n = getValue(i, neighbours);
-					num.set(i, (double) ((double)n-alpha*gamma*Math.pow(load.get(i),gamma-1)));
+					num.set(i, (double) ((double) n - alpha * gamma * Math.pow(load.get(i), gamma - 1)));
 
 				}
 
@@ -137,33 +158,32 @@ public class FennelCustom{
 					}
 				}
 
-					h = index1;
-					l = load.get(index1);
-					l = l + 1;
-					load.set(index1, l);
-					if (Result.get((long) index1) == null) {
-						List<Long> L = new ArrayList<>();
-						L.add(source);
-						Result.put((long) index1, L);
-					} else {
-						List<Long> L = new ArrayList<>();
-						L = Result.get((long) index1);
-						L.add(source);
-						Result.put((long) index1, L);
-					}
+				h = index1;
+				l = load.get(index1);
+				l = l + 1;
+				load.set(index1, l);
+				if (Result.get((long) index1) == null) {
+					List<Long> L = new ArrayList<>();
+					L.add(source);
+					Result.put((long) index1, L);
+				} else {
+					List<Long> L = new ArrayList<>();
+					L = Result.get((long) index1);
+					L.add(source);
+					Result.put((long) index1, L);
+				}
 			}
 			return h;
 		}
 
-		public int getValue(int p,List<Long> n){
+		public int getValue(int p, List<Long> n) {
 
-			int ne=0;
+			int ne = 0;
 			List<Long> list = new ArrayList<>();
-			for(int i=0;i<n.size();i++)
-			{
-				Long v=n.get(i);
-				list =Result.get((long) p);
-				if(list!=null) {
+			for (int i = 0; i < n.size(); i++) {
+				Long v = n.get(i);
+				list = Result.get((long) p);
+				if (list != null) {
 					if (list.contains(v)) {
 						ne++;
 					}
@@ -174,35 +194,6 @@ public class FennelCustom{
 		}
 
 
-	}
-
-	private static DataStream<Tuple2<Long, List<Long>>> getGraphStream(StreamExecutionEnvironment env) {
-		return env.fromCollection(getVertices());
-	}
-
-	public static final List<Tuple2<Long, List<Long>>> getVertices() {
-		List<Tuple2<Long, List<Long>>> vertices= new ArrayList<>();
-		List<Long> n1 = new ArrayList<>();
-		n1.add(4L);
-		vertices.add(new Tuple2<Long, List<Long>>(1L, n1));
-		List<Long> n2 = new ArrayList<>();
-		n2.add(0,3L);
-		n2.add(0,6L);
-		vertices.add(new Tuple2<Long, List<Long>>(2L, n2));
-		List<Long> n3 = new ArrayList<>();
-		n3.add(0,2L);
-		vertices.add(new Tuple2<Long, List<Long>>(3L, n3));
-		List<Long> n4 = new ArrayList<>();
-		n4.add(0,1L);
-		n4.add(1,5L);
-		vertices.add(new Tuple2<Long, List<Long>>(4L, n4));
-		List<Long> n5 = new ArrayList<>();
-		n5.add(0,4L);
-		vertices.add(new Tuple2<Long, List<Long>>(5L, n5));
-		List<Long> n6 = new ArrayList<>();
-		n6.add(0,2L);
-		vertices.add(new Tuple2<Long, List<Long>>(6L, n6));
-		return vertices;
 	}
 
 
