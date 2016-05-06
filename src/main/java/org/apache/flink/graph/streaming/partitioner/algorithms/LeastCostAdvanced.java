@@ -51,7 +51,7 @@ public class LeastCostAdvanced {
 			public void values(List<Tuple2<Long,Long>> Edges){
 				int s=0;
 				s=Edges.size();
-				Tuple2<Long,Long> d=new Tuple2<>();
+				Tuple2<Long,Long> d;
 				Long V1;
 				Long V2;
 				List<Long> vertex =new ArrayList<>();
@@ -67,7 +67,7 @@ public class LeastCostAdvanced {
 
 				Long n= Long.valueOf(vertex.size());
 				Long m= Long.valueOf((long) s);
-				alpha= ((Math.pow(k,0.5))*m)/Math.pow(n,1.5);
+				alpha= (((Math.pow(k,0.5))*Math.pow(n,1.5))+m)/Math.pow(n,1.5);
 			}
 
 			public void partition(List<Tuple2<Long,Long>> Edges)

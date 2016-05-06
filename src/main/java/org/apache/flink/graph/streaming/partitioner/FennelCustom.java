@@ -83,7 +83,6 @@ public class FennelCustom {
 		private static final long serialVersionUID = 1L;
 		private final HashMap<Long, List<Long>> Result = new HashMap<>();//partitionid, list of vertices placed
 		private final List<Double> load = new ArrayList<>(); //for load of each partiton
-		private final List<Tuple2<Long, Long>> edges = new ArrayList<>();
 		SampleKeySelector<T, ?> keySelector;
 		private Long k;  //no. of partitions
 		private double alpha = 0;  //parameters for formula
