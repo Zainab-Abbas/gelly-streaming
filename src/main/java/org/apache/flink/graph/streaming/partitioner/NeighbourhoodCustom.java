@@ -27,7 +27,7 @@ public class NeighbourhoodCustom {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Edge<Long, NullValue>> edges = getGraphStream(env);
 		edges.getTransformation().getOutputType();
-		edges.partitionCustom(new test(new SampleKeySelector(0)),new SampleKeySelector(0)).print();
+		edges.partitionCustom(new test(new SampleKeySelector(0),8L),new SampleKeySelector(0)).print();
 
 		env.execute("testing custom partitioner");
 		System.out.println("lala");
@@ -61,11 +61,14 @@ public class NeighbourhoodCustom {
 		private final List<Long> load = new ArrayList<>(); //for load of each partiton
 		private final List<Long> subset = new ArrayList<>();
 		private Long k;   //no. of partitions
+		private Double loadlimit=0.0;
+		private Long n=0L;
 
-		public test(SampleKeySelector<T, ?> keySelector) {
+		public test(SampleKeySelector<T, ?> keySelector,Long n) {
 			this.keySelector = keySelector;
 			this.k = (long) 4;
-
+			this.n=n;
+			this.loadlimit=(k*1.1+8)/k;;
 		}
 
 		@Override
@@ -113,6 +116,31 @@ public class NeighbourhoodCustom {
 				}
 
 				h = Cost(source, target);
+
+				Long d1 = Degree.get((long) h, source);
+				Long d2 = Degree.get((long) h, target);
+				if (d1 == null) {
+					d1 = (long) 0;
+				}
+				if (d2 == null) {
+					d2 = (long) 0;
+				}       //return 2 as 2 vertices here
+				d1++;
+				d2++;
+				Long l = load.get(h);
+				l++;
+				load.set(h, l);
+				Degree.put((long) h, source, d1);
+				Degree.put((long) h, target, d2);
+				if (Result.get((long) h) != null) {
+					List<Tuple2<Long, Long>> L = Result.get((long) h);
+					L.add(new Tuple2<>(source, target));
+					Result.put((long) h, L);
+				} else {
+					List<Tuple2<Long, Long>> L = new ArrayList<>();
+					L.add(new Tuple2<>(source, target));
+					Result.put((long) h, L);
+				}
 				System.out.println("one");
 				subset.clear();
 			}
@@ -123,100 +151,54 @@ public class NeighbourhoodCustom {
 		public int Cost(Long source, Long target) {
 			Long max = subset.get(0);
 			int sub = 0;
-			List<Integer> tie = new ArrayList<>();
 			for (int j = 1; j < k; j++) {
 
-				if (max < subset.get(j)) {
+				if (max < subset.get(j) && load.get(j)<loadlimit) {
 					max = subset.get(j);
-					sub = j;
-				} else if (max == subset.get(j)) {
-					if (!tie.contains(sub)) {
-						tie.add(sub);
+					sub =j;
+				}
+
+				else if (max == subset.get(j) && load.get(j)<loadlimit && subset.get(j)==1){
+					if(Degree.get((long)j,source)!=null && Degree.get((long)sub,target)!=null ){
+						if(Degree.get((long)j,source)< Degree.get((long)sub,target)){
+							max = subset.get(j);
+							sub =j;
+						}
+						else if(load.get(j) < load.get(sub)){
+							max = subset.get(j);
+							sub =j;
+						}
+
 					}
-					if (!tie.contains(j)) {
-						tie.add(j);
+					else if(Degree.get((long)j,target)!=null && Degree.get((long)sub,source)!=null){
+						if(Degree.get((long)j,target)< Degree.get((long)sub,source)){
+							max = subset.get(j);
+							sub =j;
+						}
+						else if(load.get(j) < load.get(sub)){
+							max = subset.get(j);
+							sub =j;
+						}
+
+					}
+					else{
+						if(load.get(j) < load.get(sub))
+						{
+							max = subset.get(j);
+							sub =j;
+						}
 					}
 
+				}
+				else if(max == subset.get(j) && subset.get(j)==0 && load.get(j) < load.get(sub))
+				{
+					max = subset.get(j);
+					sub =j;
 				}
 			}
 
-			int h = addEdge(tie, sub, source, target);
-			return h;
+			return sub;
 
-
-		}
-
-
-		public int addEdge(List<Integer> Tie, int Max, Long source, Long target) {
-
-			if (!Tie.isEmpty()) {
-				int max = Tie.get(0);
-				int s = Tie.size();
-				int val_sub = 0;
-				int val = (int) (subset.get(max) + load.get(max));
-				for (int j = 1; j <= (s - 1); j++) {
-
-					if (val >= (int) (subset.get(j) + load.get(j))) {
-						val = (int) (subset.get(j) + load.get(j));
-						val_sub = j;
-						System.out.println("Hola   1!!");
-					}
-				}
-
-				Long d1 = Degree.get((long) val_sub, source);
-				Long d2 = Degree.get((long) val_sub, target);
-				if (d1 == null) {
-					d1 = (long) 0;
-				}
-				if (d2 == null) {
-					d2 = (long) 0;
-				}       //return 2 as 2 vertices here
-				d1++;
-				d2++;
-				Long l = load.get(val_sub);
-				l++;
-				load.set(val_sub, l);
-				Degree.put((long) val_sub, source, d1);
-				Degree.put((long) val_sub, target, d2);
-				if (Result.get((long) val_sub) != null) {
-					List<Tuple2<Long, Long>> L = Result.get((long) val_sub);
-					L.add(new Tuple2<>(source, target));
-					Result.put((long) val_sub, L);
-				} else {
-					List<Tuple2<Long, Long>> L = new ArrayList<>();
-					L.add(new Tuple2<>(source, target));
-					Result.put((long) val_sub, L);
-				}
-				return val_sub;
-			} else {
-				System.out.println("Hola   2 !!");
-				Long d1 = Degree.get((long) Max, source);
-				Long d2 = Degree.get((long) Max, target);
-				if (d1 == null) {
-					d1 = (long) 0;
-				}
-				if (d2 == null) {
-					d2 = (long) 0;
-				}       //return 2 as 2 vertices here
-				d1++;
-				d2++;
-				Long l = load.get(Max);
-				l++;
-				load.set(Max, l);
-				Degree.put((long) Max, source, d1);
-				Degree.put((long) Max, target, d2);
-				if (Result.get((long) Max) != null) {
-					List<Tuple2<Long, Long>> L = Result.get((long) Max);
-					L.add(new Tuple2<>(source, target));
-					Result.put((long) Max, L);
-				} else {
-					List<Tuple2<Long, Long>> L = new ArrayList<>();
-					L.add(new Tuple2<>(source, target));
-					Result.put((long) Max, L);
-				}
-
-				return Max;
-			}
 
 		}
 
@@ -251,11 +233,11 @@ public class NeighbourhoodCustom {
 		public static final List<Edge<Long, NullValue>> getEdges() {
 			List<Edge<Long, NullValue>> edges = new ArrayList<>();
 			edges.add(new Edge<>(1L, 2L, NullValue.getInstance()));
-			edges.add(new Edge<>(1L, 3L, NullValue.getInstance()));
-			edges.add(new Edge<>(2L, 3L, NullValue.getInstance()));
-			edges.add(new Edge<>(4L, 0L, NullValue.getInstance()));
-			edges.add(new Edge<>(6L, 7L, NullValue.getInstance()));
-			edges.add(new Edge<>(8L, 9L, NullValue.getInstance()));
+			edges.add(new Edge<>(3L, 4L, NullValue.getInstance()));
+			edges.add(new Edge<>(5L, 6L, NullValue.getInstance()));
+			edges.add(new Edge<>(7L, 8L, NullValue.getInstance()));
+			edges.add(new Edge<>(4L, 7L, NullValue.getInstance()));
+			edges.add(new Edge<>(8L, 4L, NullValue.getInstance()));
 			return edges;
 		}
 

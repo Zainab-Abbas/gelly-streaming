@@ -8,6 +8,7 @@ import org.apache.flink.hadoop.shaded.com.google.common.collect.Table;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Basic neighbourhood based partitioner
@@ -29,24 +30,39 @@ public class Neighbourhood {
     private static void getEdges(List<Tuple2<Long,Long>> E)
     {
         E.add(new Tuple2<Long, Long>(1L, 2L));
-        E.add(new Tuple2<Long, Long>(3L, 4L));
-        E.add(new Tuple2<Long, Long>(5L, 6L));
         E.add(new Tuple2<Long, Long>(7L, 8L));
+        E.add(new Tuple2<Long, Long>(5L, 6L));
+        E.add(new Tuple2<Long, Long>(3L, 4L));
         E.add(new Tuple2<Long, Long>(4L, 7L));
-        E.add(new Tuple2<Long, Long>(4L, 8L));
+        E.add(new Tuple2<Long, Long>(1L, 4L));
+        E.add(new Tuple2<Long, Long>(3L, 1L));
+        E.add(new Tuple2<Long, Long>(1L, 5L));
+        E.add(new Tuple2<Long, Long>(1L, 6L));
+        E.add(new Tuple2<Long, Long>(1L, 7L));
+        E.add(new Tuple2<Long, Long>(1L, 8L));
+        E.add(new Tuple2<Long, Long>(2L, 7L));
+        E.add(new Tuple2<Long, Long>(2L, 8L));
+        E.add(new Tuple2<Long, Long>(2L, 3L));
+        E.add(new Tuple2<Long, Long>(2L, 4L));
+        E.add(new Tuple2<Long, Long>(2L, 6L));
+        E.add(new Tuple2<Long, Long>(2L, 7L));
+
+
     }
 
     private static class Partition extends CustomPartitioners {
 
         private final Table<Long,Long,Long> Degree =  HashBasedTable.create();   //for <partition.no, vertexId, Degree>
         private final HashMap<Long,List<Tuple2<Long,Long>>> Result = new HashMap<>();
-        private final List<Long> load = new ArrayList<>(); //for load of each partiton
+        private final List<Double> load = new ArrayList<>(); //for load of each partiton
         private final List<Long> subset = new ArrayList<>();
         private Long k;   //no. of partitions
+        private Double loadlimit=0.0;
 
 
         public Partition(Long n) {
             k=n;
+            loadlimit=(k*1.1+8)/k;
         }
 
         public void partition(List<Tuple2<Long,Long>> Edges)
@@ -55,7 +71,7 @@ public class Neighbourhood {
 
 
            for(int j=0; j<k;j++){
-            load.add(j, (long) 0);
+            load.add(j,0.0);
            }
            Edges.stream().forEach(s -> {
                Long V1 = s.f0;
@@ -63,7 +79,7 @@ public class Neighbourhood {
 
                if(Degree.isEmpty())
                {
-                   load.set(0, (long) 1);
+                   load.set(0, (double) 1);
                    Degree.put((long) 0, V1,(long) 1);
                    Degree.put((long) 0, V2,(long) 1);
                    List<Tuple2<Long,Long>> L = new ArrayList<>();
@@ -95,75 +111,60 @@ public class Neighbourhood {
         public void Cost(Tuple2<Long,Long> E) {
             Long max = subset.get(0);
             int sub = 0;
-             List<Integer> tie= new ArrayList<>();
             for (int j = 1; j < k; j++) {
 
-                if (max < subset.get(j)) {
+                if (max < subset.get(j) && load.get(j).compareTo(loadlimit)<0) {
                     max = subset.get(j);
                     sub =j;
                 }
 
-                else if (max == subset.get(j)){
-                    if(!tie.contains(sub)){
-                        tie.add(sub);
+                else if (max == subset.get(j) && load.get(j).compareTo(loadlimit)<0 && subset.get(j)==1){
+                    if(Degree.get((long)j,E.f0)!=null && Degree.get((long)sub,E.f1)!=null ){
+                        if(Degree.get((long)j,E.f0)< Degree.get((long)sub,E.f1)){
+                            max = subset.get(j);
+                            sub =j;
+                        }
+                        else if(load.get(j).compareTo(load.get(sub))<0){
+                            max = subset.get(j);
+                            sub =j;
+                        }
+
                     }
-                    if(!tie.contains(j)){
-                        tie.add(j);
+                    else if(Degree.get((long)j,E.f1)!=null && Degree.get((long)sub,E.f0)!=null){
+                        if(Degree.get((long)j,E.f1)< Degree.get((long)sub,E.f0)){
+                            max = subset.get(j);
+                            sub =j;
+                        }
+                        else if(load.get(j).compareTo(load.get(sub))<0){
+                            max = subset.get(j);
+                            sub =j;
+                        }
+
+                    }
+                    else{
+                        if(load.get(j).compareTo(load.get(sub))<0)
+                        {
+                            max = subset.get(j);
+                            sub =j;
+                        }
                     }
 
                 }
+                else if(max == subset.get(j) && subset.get(j)==0 && load.get(j).compareTo(load.get(sub))<0)
+                {
+                    max = subset.get(j);
+                    sub =j;
+                }
             }
 
-           addEdge(tie,sub,E);
+           addEdge(sub,E);
 
 
         }
 
-        public void addEdge(List<Integer> Tie, int Max, Tuple2<Long,Long> E){
+        public void addEdge( int Max, Tuple2<Long,Long> E){
 
-            if(!Tie.isEmpty()){
-                int max =  Tie.get(0);
-                int s= Tie.size();
-                int val_sub=0;
-                int val = (int) (subset.get(max)+load.get(max));
-               for(int  j =1; j<= (s-1); j++){
 
-                 if(val >= (int) (subset.get(j)+load.get(j)))
-                 {
-                     val=(int) (subset.get(j)+load.get(j));
-                     val_sub=j;
-                     System.out.println("Hola   1!!");
-                 }
-               }
-
-                Long V1 = E.f0;
-                Long V2 = E.f1;
-                Long d1=Degree.get((long) val_sub, V1);
-                Long d2=Degree.get((long) val_sub, V2);
-                if(d1==null)
-                {d1=(long) 0;}
-                if(d2==null)
-                {d2=(long) 0;}       //return 2 as 2 vertices here
-                d1++;
-                d2++;
-                Long l = load.get(val_sub);
-                l++;
-                load.set(val_sub,l);
-                Degree.put((long) val_sub, V1,d1);
-                Degree.put((long) val_sub, V2,d2);
-                if(Result.get((long) val_sub)!=null)
-                {
-                    List<Tuple2<Long,Long>> L= Result.get((long) val_sub);
-                    L.add(E);
-                    Result.put((long) val_sub, L);
-                }
-                else {
-                    List<Tuple2<Long, Long>> L = new ArrayList<>();
-                    L.add(E);
-                    Result.put((long) val_sub, L);
-                }
-            }
-            else{
                 System.out.println("Hola   2 !!");
                 Long V1 = E.f0;
                 Long V2 = E.f1;
@@ -175,7 +176,7 @@ public class Neighbourhood {
                 {d2=(long) 0;}       //return 2 as 2 vertices here
                 d1++;
                 d2++;
-                Long l = load.get(Max);
+                Double l = load.get(Max);
                 l++;
                 load.set(Max,l);
                 Degree.put((long) Max, V1,d1);
@@ -191,9 +192,6 @@ public class Neighbourhood {
                     L.add(E);
                     Result.put((long) Max, L);
                 }
-
-            }
-
         }
 
         public int getValue(Tuple2<Long,Long> E, int p)
