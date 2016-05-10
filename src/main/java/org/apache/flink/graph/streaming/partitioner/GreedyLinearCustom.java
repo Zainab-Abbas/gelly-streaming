@@ -58,23 +58,25 @@ public class GreedyLinearCustom {
 
 	/////key selector /////////////////
 	private static class SampleKeySelector<K, EV> implements KeySelector<Tuple2<K, List<EV>>, K> {
+		private final int key1;
+		private List<EV> key2;
 		private static final HashMap<Long, List<Long>> DoubleKey = new HashMap<>();
-		private final int key;
 
 		public SampleKeySelector(int k) {
-			this.key = k;
+			this.key1 = k;
 		}
 
 		public K getKey(Tuple2<K, List<EV>> vertices) throws Exception {
-			DoubleKey.put(vertices.getField(key), vertices.getField(key + 1));
-			return vertices.getField(key);
+			DoubleKey.put(vertices.getField(key1), vertices.getField(key1 + 1));
+			return vertices.getField(key1);
 		}
 
-		public List<Long> getValue(Object k) throws Exception {
-			return DoubleKey.get((long) k);
+		public List<EV> getValue(Object k) throws Exception {
+			key2 = (List<EV>) DoubleKey.get((long) k);
+			DoubleKey.clear();
+			return key2;
 		}
 	}
-
 
 	///////code for partitioner/////////
 	private static class test<K, EV, T> implements Partitioner<T> {
@@ -98,7 +100,7 @@ public class GreedyLinearCustom {
 
 			List<Long> neighbours = new ArrayList<>();
 			try {
-				neighbours = keySelector.getValue(key);
+				neighbours = (List<Long>) keySelector.getValue(key);
 				System.out.println(neighbours);
 			} catch (Exception e) {
 				e.printStackTrace();
