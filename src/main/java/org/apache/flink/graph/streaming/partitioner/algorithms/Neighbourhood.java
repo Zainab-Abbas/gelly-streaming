@@ -29,23 +29,23 @@ public class Neighbourhood {
 
     private static void getEdges(List<Tuple2<Long,Long>> E)
     {
-        E.add(new Tuple2<Long, Long>(1L, 2L));
-        E.add(new Tuple2<Long, Long>(7L, 8L));
-        E.add(new Tuple2<Long, Long>(5L, 6L));
-        E.add(new Tuple2<Long, Long>(3L, 4L));
-        E.add(new Tuple2<Long, Long>(4L, 7L));
-        E.add(new Tuple2<Long, Long>(1L, 4L));
-        E.add(new Tuple2<Long, Long>(3L, 1L));
-        E.add(new Tuple2<Long, Long>(1L, 5L));
-        E.add(new Tuple2<Long, Long>(1L, 6L));
-        E.add(new Tuple2<Long, Long>(1L, 7L));
-        E.add(new Tuple2<Long, Long>(1L, 8L));
-        E.add(new Tuple2<Long, Long>(2L, 7L));
-        E.add(new Tuple2<Long, Long>(2L, 8L));
-        E.add(new Tuple2<Long, Long>(2L, 3L));
-        E.add(new Tuple2<Long, Long>(2L, 4L));
-        E.add(new Tuple2<Long, Long>(2L, 6L));
-        E.add(new Tuple2<Long, Long>(2L, 7L));
+        E.add(new Tuple2<>(1L, 2L));
+        E.add(new Tuple2<>(7L, 8L));
+        E.add(new Tuple2<>(5L, 6L));
+        E.add(new Tuple2<>(3L, 4L));
+        E.add(new Tuple2<>(4L, 7L));
+        E.add(new Tuple2<>(1L, 4L));
+        E.add(new Tuple2<>(3L, 1L));
+        E.add(new Tuple2<>(1L, 5L));
+        E.add(new Tuple2<>(1L, 6L));
+        E.add(new Tuple2<>(1L, 7L));
+        E.add(new Tuple2<>(1L, 8L));
+        E.add(new Tuple2<>(2L, 7L));
+        E.add(new Tuple2<>(2L, 8L));
+        E.add(new Tuple2<>(2L, 3L));
+        E.add(new Tuple2<>(2L, 4L));
+        E.add(new Tuple2<>(2L, 6L));
+        E.add(new Tuple2<>(2L, 0L));
 
 
     }
@@ -62,7 +62,7 @@ public class Neighbourhood {
 
         public Partition(Long n) {
             k=n;
-            loadlimit=(k*1.1+8)/k;
+            loadlimit=(k*1.1+16)/k;
         }
 
         public void partition(List<Tuple2<Long,Long>> Edges)
