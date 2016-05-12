@@ -8,10 +8,16 @@ import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.graph.Edge;
+import org.apache.flink.graph.streaming.GraphStream;
+import org.apache.flink.graph.streaming.SimpleEdgeStream;
+import org.apache.flink.graph.streaming.example.ConnectedComponentsExample;
+import org.apache.flink.graph.streaming.example.util.DisjointSet;
+import org.apache.flink.graph.streaming.library.ConnectedComponents;
 import org.apache.flink.hadoop.shaded.com.google.common.collect.HashBasedTable;
 import org.apache.flink.hadoop.shaded.com.google.common.collect.Table;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.types.NullValue;
 
 import java.util.*;
@@ -19,41 +25,44 @@ import java.util.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 
-public class NeighbourhoodCustom {
+public class DegreeBasedCustom {
 
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Edge<Long, NullValue>> edges = getGraphStream(env);
-		edges.getTransformation().getOutputType();
-		edges.partitionCustom(new test(new SampleKeySelector(0),16),new SampleKeySelector(0)).print();
+		edges.partitionCustom(new DegreeBased(new SampleKeySelector(0),16), new SampleKeySelector(0)).print();
 
-		env.execute("testing custom partitioner");
 		System.out.println("lala");
 	}
 
 	private static class SampleKeySelector<K, EV> implements KeySelector<Edge<K, EV>, K> {
-		private final int key;
-		private static final HashMap<Long,Long> DoubleKey = new HashMap<>();
+		private final int key1;
+		private EV key2;
+		private static final HashMap<Long,Long> KeyMap = new HashMap<>();
 
 		public SampleKeySelector(int k) {
-			this.key = k;
+			this.key1 = k;
 		}
 
 		public K getKey(Edge<K, EV> edge) throws Exception {
-			DoubleKey.put(edge.getField(key),edge.getField(key+1));
-			return edge.getField(key);
+			KeyMap.put(edge.getField(key1),edge.getField(key1+1));
+			return edge.getField(key1);
 		}
 
-		public long getValue (Object k) throws Exception {
-			return DoubleKey.get((long) k);
+		public EV getValue (Object k) throws Exception {
+			key2= (EV) KeyMap.get(k);
+			KeyMap.clear();
+			return key2;
+
 		}
 	}
 
 
 	///////code for partitioner/////////
-	private static class test<K, EV, T> implements Partitioner<T> {
+	private static class DegreeBased<K, EV, T> implements Partitioner<T> {
 		private static final long serialVersionUID = 1L;
 		SampleKeySelector<T, ?> keySelector;
 		private final Table<Long, Long, Long> Degree = HashBasedTable.create();   //for <partition.no, vertexId, Degree>
@@ -64,7 +73,7 @@ public class NeighbourhoodCustom {
 		private Double loadlimit=0.0;
 		private int m=0;  // no. of edges
 
-		public test(SampleKeySelector<T, ?> keySelector,int m) {
+		public DegreeBased(SampleKeySelector<T, ?> keySelector,int m) {
 			this.keySelector = keySelector;
 			this.k = (long) 4;
 			this.m=m;
@@ -74,10 +83,9 @@ public class NeighbourhoodCustom {
 		@Override
 		public int partition(Object key, int numPartitions) {
 
-			long target = 0;
+			Long target = 0L;
 			try {
-				target = keySelector.getValue(key);
-				System.out.println(target);
+				target = (Long) keySelector.getValue(key);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -86,7 +94,7 @@ public class NeighbourhoodCustom {
 			System.out.println("source");
 			System.out.println(source);
 			System.out.println("target");
-			System.out.println();
+			System.out.println(target);
 			System.out.println("end");
 
 			int h = 0;
@@ -141,7 +149,6 @@ public class NeighbourhoodCustom {
 					L.add(new Tuple2<>(source, target));
 					Result.put((long) h, L);
 				}
-				System.out.println("one");
 				subset.clear();
 			}
 
@@ -206,18 +213,11 @@ public class NeighbourhoodCustom {
 		public int getValue(Long source, Long target, int p) {
 			{
 				int i = 0;
-				Long V1 = source;
-				Long V2 = target;
-				if (Degree.contains((long) p, (long) V1) && Degree.contains((long) p, (long) V2)) {
-
-					System.out.println("one");
+				if (Degree.contains((long) p, source) && Degree.contains((long) p, target)) {
 					i = 2;
-				} else if (Degree.contains((long) p, (long) V1) && !Degree.contains((long) p, (long) V2)) {
-
-					System.out.println("one");
+				} else if (Degree.contains((long) p, source) && !Degree.contains((long) p,target)) {
 					i = 1;
-				} else if (!Degree.contains((long) p, (long) V1) && Degree.contains((long) p, (long) V2)) {
-					System.out.println("one");
+				} else if (!Degree.contains((long) p, source) && Degree.contains((long) p, target)) {
 					i = 1;
 				} else {
 					i = 0;

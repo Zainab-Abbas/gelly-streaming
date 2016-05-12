@@ -21,7 +21,7 @@ public class FennelCustom {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Tuple2<Long, List<Long>>> vertices = getGraphStream(env);
 		vertices.getTransformation().getOutputType();
-		vertices.partitionCustom(new test(new SampleKeySelector(0), 6, 4), new SampleKeySelector(0)).print();
+		vertices.partitionCustom(new Fennel(new SampleKeySelector(0), 6, 4), new SampleKeySelector(0)).print();
 
 		env.execute("testing custom partitioner");
 		System.out.println("lala");
@@ -62,24 +62,27 @@ public class FennelCustom {
 	}
 
 	private static class SampleKeySelector<K, EV> implements KeySelector<Tuple2<K, List<EV>>, K> {
+		private final int key1;
+		private List<EV> key2;
 		private static final HashMap<Long, List<Long>> DoubleKey = new HashMap<>();
-		private final int key;
 
 		public SampleKeySelector(int k) {
-			this.key = k;
+			this.key1 = k;
 		}
 
 		public K getKey(Tuple2<K, List<EV>> vertices) throws Exception {
-			DoubleKey.put(vertices.getField(key), vertices.getField(key + 1));
-			return vertices.getField(key);
+			DoubleKey.put(vertices.getField(key1), vertices.getField(key1 + 1));
+			return vertices.getField(key1);
 		}
 
-		public List<Long> getValue(Object k) throws Exception {
-			return DoubleKey.get((long) k);
+		public List<EV> getValue(Object k) throws Exception {
+			key2 = (List<EV>) DoubleKey.get((long) k);
+			DoubleKey.clear();
+			return key2;
 		}
 	}
 
-	private static class test<K, EV, T> implements Partitioner<T> {
+	private static class Fennel<K, EV, T> implements Partitioner<T> {
 		private static final long serialVersionUID = 1L;
 		private final HashMap<Long, List<Long>> Result = new HashMap<>();//partitionid, list of vertices placed
 		private final List<Double> load = new ArrayList<>(); //for load of each partiton
@@ -91,7 +94,7 @@ public class FennelCustom {
 		private int n = 0;        // no of nodes
 		private int m = 0;        //no. of vertices
 
-		public test(SampleKeySelector<T, ?> keySelector, int n, int m) {
+		public Fennel(SampleKeySelector<T, ?> keySelector, int n, int m) {
 			this.keySelector = keySelector;
 			this.k = (long) 4;
 			this.n = n;
@@ -106,7 +109,7 @@ public class FennelCustom {
 
 			List<Long> neighbours = new ArrayList<>();
 			try {
-				neighbours = keySelector.getValue(key);
+				neighbours = (List<Long>) keySelector.getValue(key);
 				System.out.println(neighbours);
 			} catch (Exception e) {
 				e.printStackTrace();

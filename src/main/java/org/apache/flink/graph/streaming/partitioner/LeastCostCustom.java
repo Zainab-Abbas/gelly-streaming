@@ -6,9 +6,16 @@ package org.apache.flink.graph.streaming.partitioner;
 
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.java.functions.KeySelector;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.graph.Edge;
+import org.apache.flink.graph.streaming.GraphStream;
+import org.apache.flink.graph.streaming.SimpleEdgeStream;
+import org.apache.flink.graph.streaming.example.ConnectedComponentsExample;
+import org.apache.flink.graph.streaming.example.util.DisjointSet;
+import org.apache.flink.graph.streaming.library.ConnectedComponents;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.types.NullValue;
 
 import java.util.*;
@@ -16,6 +23,7 @@ import java.util.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 
 public class LeastCostCustom {
@@ -23,34 +31,37 @@ public class LeastCostCustom {
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Edge<Long, NullValue>> edges = getGraphStream(env);
-		 edges.getTransformation().getOutputType();
-		edges.partitionCustom(new test(new SampleKeySelector(0)),new SampleKeySelector(0)).print();
+		edges.partitionCustom(new LeastCost(new SampleKeySelector(0)), new SampleKeySelector(0)).print();
 
 		env.execute("testing custom partitioner");
 		System.out.println("lala");
 	}
 
 	private static class SampleKeySelector<K, EV> implements KeySelector<Edge<K, EV>, K> {
-		private final int key;
-		private static final HashMap<Long,Long> DoubleKey = new HashMap<>();
+		private final int key1;
+		private EV key2;
+		private static final HashMap<Long,Long> KeyMap = new HashMap<>();
 
 		public SampleKeySelector(int k) {
-			this.key = k;
+			this.key1 = k;
 		}
 
 		public K getKey(Edge<K, EV> edge) throws Exception {
-			DoubleKey.put(edge.getField(key),edge.getField(key+1));
-			return edge.getField(key);
+			KeyMap.put(edge.getField(key1),edge.getField(key1+1));
+			return edge.getField(key1);
 		}
 
-		public long getValue (Object k) throws Exception {
-			return DoubleKey.get((long) k);
+		public EV getValue (Object k) throws Exception {
+			key2= (EV) KeyMap.get(k);
+			KeyMap.clear();
+			return key2;
+
 		}
 	}
 
 
 	///////code for partitioner/////////
-	private static class test<K, EV, T> implements Partitioner<T> {
+	private static class LeastCost<K, EV, T> implements Partitioner<T> {
 		private static final long serialVersionUID = 1L;
 		SampleKeySelector<T, ?> keySelector;
 		private final HashMap<Long,List<Long>> vertices = new HashMap<>();  //for <partition.no, vertexId>
@@ -58,7 +69,7 @@ public class LeastCostCustom {
 		private final List<Long> cost = new ArrayList<>();
 		private Long k;   //no. of partitions
 
-		public test(SampleKeySelector<T, ?> keySelector)
+		public LeastCost(SampleKeySelector<T, ?> keySelector)
 		{
 			this.keySelector = keySelector;
 			this.k=(long) 4;
@@ -68,9 +79,9 @@ public class LeastCostCustom {
 		@Override
 		public int partition(Object key, int numPartitions) {
 
-			long target=0;
+			Long target=0L;
 			try {
-				target=keySelector.getValue(key);
+				target= (Long) keySelector.getValue(key);
 				System.out.println(target);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -194,11 +205,22 @@ public class LeastCostCustom {
 	public static final List<Edge<Long, NullValue>> getEdges() {
 		List<Edge<Long, NullValue>> edges = new ArrayList<>();
 		edges.add(new Edge<>(1L, 2L, NullValue.getInstance()));
-		edges.add(new Edge<>(1L, 3L, NullValue.getInstance()));
+		edges.add(new Edge<>(7L, 8L, NullValue.getInstance()));
+		edges.add(new Edge<>(5L, 6L, NullValue.getInstance()));
+		edges.add(new Edge<>(3L, 4L, NullValue.getInstance()));
+		edges.add(new Edge<>(4L, 7L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 4L, NullValue.getInstance()));
+		edges.add(new Edge<>(3L, 1L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 5L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 6L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 7L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 8L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 7L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 8L, NullValue.getInstance()));
 		edges.add(new Edge<>(2L, 3L, NullValue.getInstance()));
-		edges.add(new Edge<>(4L, 0L, NullValue.getInstance()));
-		edges.add(new Edge<>(6L, 7L, NullValue.getInstance()));
-		edges.add(new Edge<>(8L, 9L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 4L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 6L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 0L, NullValue.getInstance()));
 		return edges;
 	}
 

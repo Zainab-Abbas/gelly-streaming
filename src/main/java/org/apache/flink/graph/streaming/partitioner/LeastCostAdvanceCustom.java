@@ -21,34 +21,37 @@ public class LeastCostAdvanceCustom {
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Edge<Long, NullValue>> edges = getGraphStream(env);
-		edges.getTransformation().getOutputType();
-		edges.partitionCustom(new test(new SampleKeySelector(0), 9, 6), new SampleKeySelector(0)).print();
+		edges.partitionCustom(new LeastCostAdvance(new SampleKeySelector(0), 8, 17), new SampleKeySelector(0)).print();
 
 		env.execute("testing custom partitioner");
 		System.out.println("lala");
 	}
 
 	private static class SampleKeySelector<K, EV> implements KeySelector<Edge<K, EV>, K> {
-		private final int key;
-		private static final HashMap<Long, Long> DoubleKey = new HashMap<>();
+		private final int key1;
+		private EV key2;
+		private static final HashMap<Long,Long> KeyMap = new HashMap<>();
 
 		public SampleKeySelector(int k) {
-			this.key = k;
+			this.key1 = k;
 		}
 
 		public K getKey(Edge<K, EV> edge) throws Exception {
-			DoubleKey.put(edge.getField(key), edge.getField(key + 1));
-			return edge.getField(key);
+			KeyMap.put(edge.getField(key1),edge.getField(key1+1));
+			return edge.getField(key1);
 		}
 
-		public long getValue(Object k) throws Exception {
-			return DoubleKey.get((long) k);
+		public EV getValue (Object k) throws Exception {
+			key2= (EV) KeyMap.get(k);
+			KeyMap.clear();
+			return key2;
+
 		}
 	}
 
 
 	///////code for partitioner/////////
-	private static class test<K, EV, T> implements Partitioner<T> {
+	private static class LeastCostAdvance<K, EV, T> implements Partitioner<T> {
 		private static final long serialVersionUID = 1L;
 		SampleKeySelector<T, ?> keySelector;
 		int n;  // no. of nodes
@@ -61,7 +64,7 @@ public class LeastCostAdvanceCustom {
 		private double alpha = 0;  //parameters for formula
 		private double gamma = 0;
 
-		public test(SampleKeySelector<T, ?> keySelector, int n, int m) {
+		public LeastCostAdvance(SampleKeySelector<T, ?> keySelector, int n, int m) {
 			this.keySelector = keySelector;
 			this.k = (long) 4;
 			this.n = n;
@@ -74,9 +77,9 @@ public class LeastCostAdvanceCustom {
 		@Override
 		public int partition(Object key, int numPartitions) {
 
-			long target = 0;
+			Long target = 0L;
 			try {
-				target = keySelector.getValue(key);
+				target = (Long) keySelector.getValue(key);
 				System.out.println(target);
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -190,11 +193,22 @@ public class LeastCostAdvanceCustom {
 	public static final List<Edge<Long, NullValue>> getEdges() {
 		List<Edge<Long, NullValue>> edges = new ArrayList<>();
 		edges.add(new Edge<>(1L, 2L, NullValue.getInstance()));
-		edges.add(new Edge<>(1L, 2L, NullValue.getInstance()));
-		edges.add(new Edge<>(4L, 0L, NullValue.getInstance()));
-		edges.add(new Edge<>(6L, 7L, NullValue.getInstance()));
-		edges.add(new Edge<>(8L, 9L, NullValue.getInstance()));
-		edges.add(new Edge<>(4L, 5L, NullValue.getInstance()));
+		edges.add(new Edge<>(7L, 8L, NullValue.getInstance()));
+		edges.add(new Edge<>(5L, 6L, NullValue.getInstance()));
+		edges.add(new Edge<>(3L, 4L, NullValue.getInstance()));
+		edges.add(new Edge<>(4L, 7L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 4L, NullValue.getInstance()));
+		edges.add(new Edge<>(3L, 1L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 5L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 6L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 7L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 8L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 7L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 8L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 3L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 4L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 6L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 0L, NullValue.getInstance()));
 		return edges;
 	}
 

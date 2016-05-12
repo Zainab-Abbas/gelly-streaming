@@ -20,8 +20,7 @@ public class GreedyLinearCustom {
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Tuple2<Long, List<Long>>> vertices = getGraphStream(env);
-		vertices.getTransformation().getOutputType();
-		vertices.partitionCustom(new test(new SampleKeySelector(0), 6), new SampleKeySelector(0)).print();
+		vertices.partitionCustom(new Greedy(new SampleKeySelector(0), 6), new SampleKeySelector(0)).print();
 
 		env.execute("testing custom partitioner");
 		System.out.println("lala");
@@ -79,7 +78,7 @@ public class GreedyLinearCustom {
 	}
 
 	///////code for partitioner/////////
-	private static class test<K, EV, T> implements Partitioner<T> {
+	private static class Greedy<K, EV, T> implements Partitioner<T> {
 		private static final long serialVersionUID = 1L;
 		private final HashMap<Long, List<Long>> Result = new HashMap<>();//partitionid, list of vertices placed
 		private final List<Long> load = new ArrayList<>(); //for load of each partiton
@@ -88,7 +87,7 @@ public class GreedyLinearCustom {
 		private Long k;  //no. of partitions
 		private Double C;     // no. of vertices/total no. of partitions
 
-		public test(SampleKeySelector<T, ?> keySelector, int m) {
+		public Greedy(SampleKeySelector<T, ?> keySelector, int m) {
 			this.keySelector = keySelector;
 			this.k = (long) 4;
 			this.C = (double) m / (double) k;
