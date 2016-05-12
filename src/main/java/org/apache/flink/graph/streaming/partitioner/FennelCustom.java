@@ -20,7 +20,6 @@ public class FennelCustom {
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Tuple2<Long, List<Long>>> vertices = getGraphStream(env);
-		vertices.getTransformation().getOutputType();
 		vertices.partitionCustom(new Fennel(new SampleKeySelector(0), 6, 4), new SampleKeySelector(0)).print();
 
 		env.execute("testing custom partitioner");
