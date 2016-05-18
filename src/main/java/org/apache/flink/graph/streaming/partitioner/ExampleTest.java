@@ -6,6 +6,7 @@ import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.io.IOReadableWritable;
 import org.apache.flink.graph.Edge;
+import org.apache.flink.graph.Graph;
 import org.apache.flink.graph.streaming.GraphStream;
 import org.apache.flink.graph.streaming.SimpleEdgeStream;
 import org.apache.flink.graph.streaming.example.WindowTriangles;
@@ -21,6 +22,7 @@ import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.runtime.partitioner.BroadcastPartitioner;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.types.LongValue;
 import org.apache.flink.types.NullValue;
 import org.apache.flink.util.Collector;
 import scala.collection.parallel.ParIterableLike;
@@ -36,7 +38,9 @@ public class ExampleTest {
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Edge<Long, NullValue>> edges = getGraphStream(env);
-		SingleOutputStreamOperator g = edges.flatMap(new FlatMapFunction<Edge<Long,NullValue>, Long>() {
+
+		//Graph<LongValue,NullValue,NullValue> graph = new Graph<>()
+	/*	SingleOutputStreamOperator g = edges.flatMap(new FlatMapFunction<Edge<Long,NullValue>, Long>() {
 			@Override
 			public void flatMap(Edge<Long, NullValue> value, Collector<Long> out) throws Exception {
 				 out.collect(value.getTarget());
@@ -44,7 +48,7 @@ public class ExampleTest {
 			}
 
 		});
-g.print();
+g.print();*/
 		//edges.partitionCustom(new test(new SampleKeySelector(0)),new SampleKeySelector(0)).print();
 //		GraphStream<Long, NullValue, NullValue> graph = new SimpleEdgeStream<>(edges.partitionCustom(new test(new SampleKeySelector(0)),new SampleKeySelector(0)), env);
 //		DataStream<DisjointSet<Long>> cc = graph.aggregate(new ConnectedComponents<Long, NullValue>(5000));
@@ -58,6 +62,9 @@ g.print();
 		/*cc.flatMap(new WindowTriangles.FlattenSet()).keyBy(0)
 				.timeWindow(Time.of(2000, TimeUnit.MILLISECONDS))
 				.fold(new Tuple2<Long, Long>(0l, 0l), new WindowTriangles.IdentityFold()).print();*/
+
+
+		edges.print();
 		env.execute("testing custom partitioner");
 		}
 
@@ -120,11 +127,22 @@ g.print();
 	public static final List<Edge<Long, NullValue>> getEdges() {
 		List<Edge<Long, NullValue>> edges = new ArrayList<>();
 		edges.add(new Edge<>(1L, 2L, NullValue.getInstance()));
-		edges.add(new Edge<>(1L, 3L, NullValue.getInstance()));
-		edges.add(new Edge<>(2L, 3L, NullValue.getInstance()));
+		edges.add(new Edge<>(7L, 8L, NullValue.getInstance()));
+		edges.add(new Edge<>(5L, 6L, NullValue.getInstance()));
+		edges.add(new Edge<>(3L, 4L, NullValue.getInstance()));
+		edges.add(new Edge<>(4L, 7L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 4L, NullValue.getInstance()));
+		edges.add(new Edge<>(3L, 1L, NullValue.getInstance()));
 		edges.add(new Edge<>(1L, 5L, NullValue.getInstance()));
-		edges.add(new Edge<>(6L, 7L, NullValue.getInstance()));
-		edges.add(new Edge<>(8L, 9L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 6L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 7L, NullValue.getInstance()));
+		edges.add(new Edge<>(1L, 8L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 7L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 8L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 3L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 4L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 6L, NullValue.getInstance()));
+		edges.add(new Edge<>(2L, 0L, NullValue.getInstance()));
 		return edges;
 	}
 }
