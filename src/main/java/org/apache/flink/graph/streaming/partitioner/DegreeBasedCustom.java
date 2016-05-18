@@ -34,7 +34,7 @@ public class DegreeBasedCustom {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<Edge<Long, NullValue>> edges = getGraphStream(env);
 		edges.partitionCustom(new DegreeBased(new SampleKeySelector(0),16), new SampleKeySelector(0)).print();
-
+		env.execute("testing custom partitioner");
 		System.out.println("lala");
 	}
 
