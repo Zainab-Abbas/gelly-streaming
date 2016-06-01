@@ -115,7 +115,7 @@ public class GreedyLinearCustom {
 	/////key selector /////////////////
 	private static class CustomKeySelector<K, EV> implements KeySelector<Tuple2<K, List<EV>>, K> {
 		private final int key1;
-		private List<EV> key2;
+		private List<EV> list;
 		private static final HashMap<Long, List<Long>> DoubleKey = new HashMap<>();
 
 		public CustomKeySelector(int k) {
@@ -128,9 +128,9 @@ public class GreedyLinearCustom {
 		}
 
 		public List<EV> getValue(Object k) throws Exception {
-			key2 = (List<EV>) DoubleKey.get((long) k);
+			list = (List<EV>) DoubleKey.get((long) k);
 			DoubleKey.clear();
-			return key2;
+			return list;
 		}
 	}
 
