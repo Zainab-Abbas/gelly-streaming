@@ -4,11 +4,19 @@ package org.apache.flink.graph.streaming.partitioner;
  * Created by zainababbas on 27/04/16.
  */
 
+import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.graph.Edge;
+import org.apache.flink.graph.streaming.GraphStream;
+import org.apache.flink.graph.streaming.SimpleEdgeStream;
+import org.apache.flink.graph.streaming.example.util.DisjointSet;
+import org.apache.flink.graph.streaming.library.ConnectedComponents;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.types.NullValue;
+import org.apache.flink.util.Collector;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,8 +27,39 @@ public class GreedyLinearCustom {
 
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
+
 		DataStream<Tuple2<Long, List<Long>>> vertices = getGraphStream(env);
-		vertices.partitionCustom(new Greedy(new SampleKeySelector(0), 6), new SampleKeySelector(0)).print();
+
+
+		vertices.partitionCustom(new Greedy(new CustomKeySelector(0), 6), new CustomKeySelector(0))
+				.flatMap((new FlatMapFunction<Tuple2<Long, ArrayList<Long>>, Edge<Long, NullValue>>() {
+					@Override
+					public void flatMap(Tuple2<Long, ArrayList<Long>> value, Collector<Edge<Long, NullValue>> out) throws Exception {
+
+						value.f1.forEach(s -> {
+							Edge<Long, NullValue> edge = new Edge<>(value.f0, s, NullValue.getInstance());
+							out.collect(edge);
+						});
+						out.close();
+					}
+				}))
+				.print();
+		GraphStream<Long, NullValue, NullValue> graph = new SimpleEdgeStream<>(vertices
+				.partitionCustom(new Greedy(new CustomKeySelector(0), 11), new CustomKeySelector(0))
+				.flatMap((new FlatMapFunction<Tuple2<Long, ArrayList<Long>>, Edge<Long, NullValue>>() {
+					@Override
+					public void flatMap(Tuple2<Long, ArrayList<Long>> value, Collector<Edge<Long, NullValue>> out) throws Exception {
+						value.f1.forEach(s -> {
+							Edge<Long, NullValue> edge = new Edge<>(value.f0, s, NullValue.getInstance());
+							out.collect(edge);
+						});
+						out.close();
+					}
+				})), env);
+
+		DataStream<DisjointSet<Long>> cc2 = graph.aggregate(new ConnectedComponents<Long, NullValue>(5000));
+		cc2.print();
 
 		env.execute("testing custom partitioner");
 		System.out.println("lala");
@@ -34,34 +73,52 @@ public class GreedyLinearCustom {
 		List<Tuple2<Long, List<Long>>> vertices = new ArrayList<>();
 		List<Long> n1 = new ArrayList<>();
 		n1.add(4L);
-		vertices.add(new Tuple2<Long, List<Long>>(1L, n1));
+		vertices.add(new Tuple2<>(1L, n1));
 		List<Long> n2 = new ArrayList<>();
 		n2.add(0, 3L);
-		n2.add(0, 6L);
-		vertices.add(new Tuple2<Long, List<Long>>(2L, n2));
+		n2.add(1, 6L);
+		vertices.add(new Tuple2<>(2L, n2));
 		List<Long> n3 = new ArrayList<>();
 		n3.add(0, 2L);
-		vertices.add(new Tuple2<Long, List<Long>>(3L, n3));
+		vertices.add(new Tuple2<>(3L, n3));
 		List<Long> n4 = new ArrayList<>();
 		n4.add(0, 1L);
 		n4.add(1, 5L);
-		vertices.add(new Tuple2<Long, List<Long>>(4L, n4));
+		vertices.add(new Tuple2<>(4L, n4));
 		List<Long> n5 = new ArrayList<>();
 		n5.add(0, 4L);
-		vertices.add(new Tuple2<Long, List<Long>>(5L, n5));
+		vertices.add(new Tuple2<>(5L, n5));
 		List<Long> n6 = new ArrayList<>();
 		n6.add(0, 2L);
-		vertices.add(new Tuple2<Long, List<Long>>(6L, n6));
+		vertices.add(new Tuple2<>(6L, n6));
+		List<Long> n7 = new ArrayList<>();
+		n7.add(0, 0L);
+		n7.add(1, 10L);
+		vertices.add(new Tuple2<>(7L, n7));
+		List<Long> n8 = new ArrayList<>();
+		n8.add(0, 10L);
+		vertices.add(new Tuple2<>(8L, n8));
+		List<Long> n9 = new ArrayList<>();
+		n9.add(0, 0L);
+		vertices.add(new Tuple2<>(9L, n9));
+		List<Long> n10 = new ArrayList<>();
+		n10.add(0, 6L);
+		n10.add(1, 9L);
+		vertices.add(new Tuple2<>(0L, n10));
+		List<Long> n11 = new ArrayList<>();
+		n11.add(0, 7L);
+		n11.add(0, 8L);
+		vertices.add(new Tuple2<>(10L, n11));
 		return vertices;
 	}
 
 	/////key selector /////////////////
-	private static class SampleKeySelector<K, EV> implements KeySelector<Tuple2<K, List<EV>>, K> {
+	private static class CustomKeySelector<K, EV> implements KeySelector<Tuple2<K, List<EV>>, K> {
 		private final int key1;
 		private List<EV> key2;
 		private static final HashMap<Long, List<Long>> DoubleKey = new HashMap<>();
 
-		public SampleKeySelector(int k) {
+		public CustomKeySelector(int k) {
 			this.key1 = k;
 		}
 
@@ -83,11 +140,11 @@ public class GreedyLinearCustom {
 		private final HashMap<Long, List<Long>> Result = new HashMap<>();//partitionid, list of vertices placed
 		private final List<Long> load = new ArrayList<>(); //for load of each partiton
 		private final List<Tuple2<Long, Long>> edges = new ArrayList<>();
-		SampleKeySelector<T, ?> keySelector;
+		CustomKeySelector<T, ?> keySelector;
 		private Long k;  //no. of partitions
 		private Double C;     // no. of vertices/total no. of partitions
 
-		public Greedy(SampleKeySelector<T, ?> keySelector, int m) {
+		public Greedy(CustomKeySelector<T, ?> keySelector, int m) {
 			this.keySelector = keySelector;
 			this.k = (long) 4;
 			this.C = (double) m / (double) k;
