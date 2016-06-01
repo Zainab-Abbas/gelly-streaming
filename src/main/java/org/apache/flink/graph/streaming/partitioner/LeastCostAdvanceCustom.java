@@ -20,19 +20,21 @@ public class LeastCostAdvanceCustom {
 
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+
 		DataStream<Edge<Long, NullValue>> edges = getGraphStream(env);
-		edges.partitionCustom(new LeastCostAdvance(new SampleKeySelector(0), 8, 17), new SampleKeySelector(0)).print();
+
+		edges.partitionCustom(new LeastCostAdvance(new CustomKeySelector(0), 8, 17), new CustomKeySelector(0)).print();
 
 		env.execute("testing custom partitioner");
 		System.out.println("lala");
 	}
 
-	private static class SampleKeySelector<K, EV> implements KeySelector<Edge<K, EV>, K> {
+	private static class CustomKeySelector<K, EV> implements KeySelector<Edge<K, EV>, K> {
 		private final int key1;
 		private EV key2;
 		private static final HashMap<Long,Long> KeyMap = new HashMap<>();
 
-		public SampleKeySelector(int k) {
+		public CustomKeySelector(int k) {
 			this.key1 = k;
 		}
 
@@ -53,7 +55,7 @@ public class LeastCostAdvanceCustom {
 	///////code for partitioner/////////
 	private static class LeastCostAdvance<K, EV, T> implements Partitioner<T> {
 		private static final long serialVersionUID = 1L;
-		SampleKeySelector<T, ?> keySelector;
+		CustomKeySelector<T, ?> keySelector;
 		int n;  // no. of nodes
 		int m; // no. of edges
 		private final HashMap<Long, List<Long>> vertices = new HashMap<>();  //for <partition.no, vertexId>
@@ -64,7 +66,7 @@ public class LeastCostAdvanceCustom {
 		private double alpha = 0;  //parameters for formula
 		private double gamma = 0;
 
-		public LeastCostAdvance(SampleKeySelector<T, ?> keySelector, int n, int m) {
+		public LeastCostAdvance(CustomKeySelector keySelector, int n, int m) {
 			this.keySelector = keySelector;
 			this.k = (long) 4;
 			this.n = n;
