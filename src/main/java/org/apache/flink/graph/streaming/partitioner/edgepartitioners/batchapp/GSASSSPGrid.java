@@ -1,0 +1,330 @@
+package org.apache.flink.graph.streaming.partitioner.edgepartitioners.batchapp;
+
+/**
+ * Created by zainababbas on 18/04/2017.
+ */
+
+import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.Partitioner;
+import org.apache.flink.api.java.DataSet;
+import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.graph.Edge;
+import org.apache.flink.graph.Graph;
+import org.apache.flink.graph.Vertex;
+import org.apache.flink.graph.gsa.ApplyFunction;
+import org.apache.flink.graph.gsa.GatherFunction;
+import org.apache.flink.graph.gsa.Neighbor;
+import org.apache.flink.graph.gsa.SumFunction;
+import org.apache.flink.graph.streaming.partitioner.edgepartitioners.keyselector.CustomKeySelector2;
+import org.apache.flink.graph.streaming.partitioner.object.StoredObject;
+import org.apache.flink.graph.streaming.partitioner.object.StoredState;
+import org.apache.flink.types.NullValue;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+
+public class GSASSSPGrid {
+
+	// --------------------------------------------------------------------------------------------
+	//  Program
+	// --------------------------------------------------------------------------------------------
+
+	public static void main(String[] args) throws Exception {
+
+		if(!parseParameters(args)) {
+			return;
+		}
+		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
+
+
+
+		DataSet<Edge<Long, NullValue>> data = env.readTextFile(edgesInputPath).map(new MapFunction<String, Edge<Long, NullValue>>() {
+
+			@Override
+			public Edge<Long, NullValue> map(String s) {
+				String[] fields = s.split("\\ ");
+				long src = Long.parseLong(fields[0]);
+				long trg = Long.parseLong(fields[1]);
+				return new Edge<>(src, trg, NullValue.getInstance());
+			}
+		});
+
+		env.setParallelism(k);
+		//DataSet<Edge<Long, NullValue>> partitionedData =
+		//			data.partitionCustom(new GreedyPartitioner<>(new CustomKeySelector2(0),k), new CustomKeySelector2<>(0));
+
+		Graph<Long, Double, NullValue> graph = Graph.fromDataSet(data.partitionCustom(new GridPartitioner<>(new CustomKeySelector2(0),k), new CustomKeySelector2<>(0)), new InitVertices(srcVertexId), env);
+		//Graph<Long, Double, NullValue> graph = Graph.fromDataSet(data, new InitVertices(srcVertexId), env);
+
+		// Execute the GSA iteration
+		Graph<Long, Double, NullValue> result = graph.runGatherSumApplyIteration(
+				new CalculateDistances(), new ChooseMinDistance(), new UpdateDistance(), maxIterations);
+
+		// Extract the vertices as the result
+		DataSet<Vertex<Long, Double>> singleSourceShortestPaths = result.getVertices();
+
+		if(fileOutput) {
+			singleSourceShortestPaths.writeAsCsv(outputPath, "\n", ",");
+
+			// since file sinks are lazy, we trigger the execution explicitly
+		} else {
+			singleSourceShortestPaths.print();
+		}
+
+		JobExecutionResult result1 = env.execute("My Flink Job1");
+
+		try {
+			FileWriter fw = new FileWriter(logPath, true); //the true will append the new data
+			//fw.write("The job took " + result.getNetRuntime(TimeUnit.SECONDS) + " seconds to execute" + "\n");//appends the string to the file
+			//fw.write("The job took " + result.getNetRuntime(TimeUnit.NANOSECONDS) + " nanoseconds to execute" + "\n");
+			fw.write("The job1 took " + result1.getNetRuntime(TimeUnit.SECONDS) + " seconds to execute" + "\n");//appends the string to the file
+			fw.write("The job1 took " + result1.getNetRuntime(TimeUnit.NANOSECONDS) + " nanoseconds to execute" + "\n");
+			fw.close();
+		} catch (IOException ioe) {
+			System.err.println("IOException: " + ioe.getMessage());
+		}
+
+
+
+
+
+	}
+
+	// --------------------------------------------------------------------------------------------
+	//  Single Source Shortest Path UDFs
+	// --------------------------------------------------------------------------------------------
+
+	@SuppressWarnings("serial")
+	private static final class InitVertices implements MapFunction<Long, Double>{
+
+		private long srcId;
+
+		public InitVertices(long srcId) {
+			this.srcId = srcId;
+		}
+
+		public Double map(Long id) {
+			if (id.equals(srcId)) {
+				return 0.0;
+			}
+			else {
+				return Double.POSITIVE_INFINITY;
+			}
+		}
+	}
+
+	@SuppressWarnings("serial")
+	private static final class CalculateDistances extends GatherFunction<Double, NullValue, Double> {
+
+		public Double gather(Neighbor<Double,  NullValue> neighbor) {
+			return neighbor.getNeighborValue() + 1;
+		}
+
+	}
+
+	@SuppressWarnings("serial")
+	private static final class ChooseMinDistance extends SumFunction<Double, NullValue, Double> {
+
+		public Double sum(Double newValue, Double currentValue) {
+			return Math.min(newValue, currentValue);
+		}
+	}
+
+	@SuppressWarnings("serial")
+	private static final class UpdateDistance extends ApplyFunction<Long, Double, Double> {
+
+		public void apply(Double newDistance, Double oldDistance) {
+			if (newDistance < oldDistance) {
+				setResult(newDistance);
+			}
+		}
+
+	}
+
+	// --------------------------------------------------------------------------------------------
+	//  Util methods
+	// --------------------------------------------------------------------------------------------
+	private static class GridPartitioner<T> implements Partitioner<T> {
+		private static final long serialVersionUID = 1L;
+		CustomKeySelector2 keySelector;
+
+		static int count =0;
+		private static final int MAX_SHRINK = 100;
+		private double seed;
+		private int shrink;
+		private int k;
+		private int nrows, ncols;
+		LinkedList<Integer>[] constraint_graph;
+		StoredState currentState;
+
+		public GridPartitioner(CustomKeySelector2 keySelector, int k)
+		{
+			this.keySelector = keySelector;
+			this.k= k;
+			this.seed = Math.random();
+			Random r = new Random();
+			shrink = r.nextInt(MAX_SHRINK);
+			this.constraint_graph = new LinkedList[k];
+			this.currentState = new StoredState(k);
+
+		}
+
+		@Override
+		public int partition(Object key, int numPartitions) {
+
+			long target = 0L;
+			try {
+				target = (long) keySelector.getValue(key);
+			} catch (Exception e) {
+				e.printStackTrace();
+
+				count++;
+				System.out.println(count);
+			}
+			long source = (long) key;
+			make_grid_constraint();
+
+			int machine_id = -1;
+
+			StoredObject first_vertex = currentState.getRecord(source);
+			StoredObject second_vertex = currentState.getRecord(target);
+
+
+			int shard_u = Math.abs((int) ( (int) source*seed*shrink) % k);
+			int shard_v = Math.abs((int) ( (int) target*seed*shrink) % k);
+
+			LinkedList<Integer> costrained_set = (LinkedList<Integer>) constraint_graph[shard_u].clone();
+			costrained_set.retainAll(constraint_graph[shard_v]);
+
+			//CASE 1: GREEDY ASSIGNMENT
+			LinkedList<Integer> candidates = new LinkedList<Integer>();
+			int min_load = Integer.MAX_VALUE;
+			for (int m : costrained_set){
+				int load = currentState.getMachineLoad(m);
+				if (load<min_load){
+					candidates.clear();
+					min_load = load;
+					candidates.add(m);
+				}
+				if (load == min_load){
+					candidates.add(m);
+				}
+			}
+			//*** PICK A RANDOM ELEMENT FROM CANDIDATES
+			Random r = new Random();
+			int choice = r.nextInt(candidates.size());
+			machine_id = candidates.get(choice);
+
+			//UPDATE EDGES
+			Edge e = new Edge<>(source, target, NullValue.getInstance());
+			currentState.incrementMachineLoad(machine_id,e);
+
+			//UPDATE RECORDS
+			if (currentState.getClass() == StoredState.class){
+				StoredState cord_state = (StoredState) currentState;
+				//NEW UPDATE RECORDS RULE TO UPFDATE THE SIZE OF THE PARTITIONS EXPRESSED AS THE NUMBER OF VERTICES THEY CONTAINS
+				if (!first_vertex.hasReplicaInPartition(machine_id)){ first_vertex.addPartition(machine_id); cord_state.incrementMachineLoadVertices(machine_id);}
+				if (!second_vertex.hasReplicaInPartition(machine_id)){ second_vertex.addPartition(machine_id); cord_state.incrementMachineLoadVertices(machine_id);}
+			}
+			else{
+				//1-UPDATE RECORDS
+				if (!first_vertex.hasReplicaInPartition(machine_id)){ first_vertex.addPartition(machine_id);}
+				if (!second_vertex.hasReplicaInPartition(machine_id)){ second_vertex.addPartition(machine_id);}
+			}
+
+
+
+			//System.out.print("source"+source);
+			//System.out.println("target"+target);
+			//System.out.println("machineid"+machine_id);
+
+			return machine_id;
+		}
+
+		private void make_grid_constraint() {
+			initializeRowColGrid();
+			for (int i = 0; i < k; i++) {
+				LinkedList<Integer> adjlist = new LinkedList<Integer>();
+				// add self
+				adjlist.add(i);
+				// add the row of i
+				int rowbegin = (i/ncols) * ncols;
+				for (int j = rowbegin; j < rowbegin + ncols; ++j)
+					if (i != j) adjlist.add(j);
+				// add the col of i
+				for (int j = i % ncols; j < k; j+=ncols){
+					if (i != j) adjlist.add(j);
+				}
+				Collections.sort(adjlist);
+				constraint_graph[i]=adjlist;
+			}
+
+		}
+
+		private void initializeRowColGrid() {
+			double approx_sqrt = Math.sqrt(k);
+			nrows = (int) approx_sqrt;
+			for (ncols = nrows; ncols <= nrows + 2; ++ncols) {
+				if (ncols * nrows == k) {
+					return;
+				}
+			}
+			System.out.println("ERRORE Num partitions "+k+" cannot be used for grid ingress.");
+			System.exit(-1);
+		}
+
+
+
+
+
+	}
+
+	private static boolean fileOutput = false;
+
+	private static Long srcVertexId = 1l;
+
+	private static String edgesInputPath = null;
+
+	private static String outputPath = null;
+
+	private static String logPath = null;
+
+	private static int maxIterations = 5;
+
+	private static int k = 4;
+
+	private static boolean parseParameters(String[] args) {
+
+		if (args.length > 0) {
+			if(args.length != 6) {
+				System.err.println("Usage: GSASSSPHash <source vertex id>" +
+										   " <input edges path> <output path> <log>  <num iterations> <no. of partitions>");
+				return false;
+			}
+
+			fileOutput = true;
+			srcVertexId = Long.parseLong(args[0]);
+			edgesInputPath = args[1];
+			outputPath = args[2];
+			logPath = args[3];
+			maxIterations = Integer.parseInt(args[4]);
+			k = Integer.parseInt(args[5]);
+		} else {
+			System.out.println("Executing GSASingle Source Shortest Paths example "
+									   + "with default parameters and built-in default data.");
+			System.out.println("  Provide parameters to read input data from files.");
+			System.out.println("  See the documentation for the correct format of input files.");
+			System.out.println("Usage: GSASSSPHash <source vertex id>" +
+									   " <input edges path> <output path> <log path><num iterations> <no. of partitions>");
+		}
+		return true;
+	}
+
+
+}
+

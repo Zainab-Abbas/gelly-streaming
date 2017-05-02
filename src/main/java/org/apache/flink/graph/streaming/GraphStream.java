@@ -1,24 +1,4 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.flink.graph.streaming;
-
-import java.io.Serializable;
 
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -28,9 +8,11 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.types.NullValue;
 
+import java.io.Serializable;
+
 /**
  * The super-class of all graph stream types.
- * 
+ *
  * @param <K> the vertex ID type
  * @param <VV> the vertex value type
  * @param <EV> the edge value type
@@ -129,13 +111,13 @@ public abstract class GraphStream<K, VV, EV> {
 	public abstract GraphStream<K, VV, EV> reverse();
 
 	/**
-	 * Applies an incremental aggregation on a graphstream and returns a stream of aggregation results 
-	 * 
+	 * Applies an incremental aggregation on a graphstream and returns a stream of aggregation results
+	 *
 	 * @param graphAggregation
 	 * @param <S>
 	 * @param <T>
-     * @return
-     */
+	 * @return
+	 */
 	public abstract <S extends Serializable, T> DataStream<T> aggregate(
-			GraphAggregation<K,EV,S,T> graphAggregation);
+																			   GraphAggregation<K,EV,S,T> graphAggregation);
 }

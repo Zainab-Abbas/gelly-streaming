@@ -33,7 +33,6 @@ import org.apache.flink.graph.Edge;
 import org.apache.flink.graph.EdgeDirection;
 import org.apache.flink.graph.streaming.EdgesApply;
 import org.apache.flink.graph.streaming.SimpleEdgeStream;
-import org.apache.flink.graph.streaming.example.util.DisjointSet;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.AscendingTimestampExtractor;
@@ -198,22 +197,6 @@ public class WindowTriangles implements ProgramDescription {
     }
 
     @SuppressWarnings("serial")
-	public static final class FlattenSet implements FlatMapFunction<DisjointSet<Long>, Tuple2<Long, Long>> {
-
-    	private Tuple2<Long, Long> t = new Tuple2<>();
-
-		@Override
-		public void flatMap(DisjointSet<Long> set, Collector<Tuple2<Long, Long>> out) {
-			for (Long vertex : set.getMatches().keySet()) {
-	            Long parent = set.find(vertex);
-	            t.setField(vertex, 0);
-	            t.setField(parent, 1);
-	            out.collect(t);
-			}
-		}
-	}
-
-    @SuppressWarnings("serial")
 	public static final class IdentityFold implements FoldFunction<Tuple2<Long, Long>, Tuple2<Long, Long>> {
 		public Tuple2<Long, Long> fold(Tuple2<Long, Long> accumulator,
 				Tuple2<Long, Long> value) throws Exception {
@@ -223,11 +206,11 @@ public class WindowTriangles implements ProgramDescription {
 
     @SuppressWarnings("serial")
 	public static final class EdgeValueTimestampExtractor extends AscendingTimestampExtractor<Edge<Long, Long>> {
-        @Override
-        public long extractAscendingTimestamp(Edge<Long, Long> element, long currentTimestamp) {
-            return element.getValue();
-        }
-    }
+		@Override
+		public long extractAscendingTimestamp(Edge<Long, Long> element) {
+			return element.getValue();
+		}
+	}
 
     @SuppressWarnings("serial")
 	public static final class RemoveEdgeValue implements MapFunction<Edge<Long,Long>, NullValue> {

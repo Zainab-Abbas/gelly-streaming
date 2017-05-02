@@ -1,21 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.flink.graph.streaming;
 
 import org.apache.flink.api.common.functions.FilterFunction;
@@ -23,6 +5,7 @@ import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.functions.KeySelector;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
@@ -32,23 +15,18 @@ import org.apache.flink.graph.Vertex;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.TimestampExtractor;
-import org.apache.flink.streaming.api.windowing.time.AbstractTime;
+import org.apache.flink.streaming.api.functions.AscendingTimestampExtractor;
+import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.types.NullValue;
 import org.apache.flink.util.Collector;
 
 import java.io.Serializable;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  *
- * Represents a graph stream where the stream consists solely of {@link org.apache.flink.graph.Edge edges}
- * without timestamps.
+ * Represents a graph stream where the stream consists solely of {@link org.apache.flink.graph.Edge edges}.
  * <p>
- * For event-time support @see 
  *
  * @see org.apache.flink.graph.Edge
  *
@@ -64,7 +42,7 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 	/**
 	 * Creates a graph from an edge stream.
 	 * The time characteristic is set to ingestion time  by default.
-	 * 
+	 *
 	 * @see {@link org.apache.flink.streaming.api.TimeCharacteristic}
 	 *
 	 * @param edges a DataStream of edges.
@@ -78,33 +56,35 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 
 	/**
 	 * Creates a graph from an edge stream operating in event time specified by timeExtractor .
-	 * 
+	 *
 	 * The time characteristic is set to event time.
-	 * 
+	 *
 	 * @see {@link org.apache.flink.streaming.api.TimeCharacteristic}
-	 * 
+	 *
 	 * @param edges a DataStream of edges.
 	 * @param timeExtractor the timestamp extractor.
 	 * @param context the execution environment.
-     */
-	public SimpleEdgeStream(DataStream<Edge<K, EV>> edges, TimestampExtractor<Edge<K,EV>> timeExtractor, StreamExecutionEnvironment context) {
+	 */
+	public SimpleEdgeStream(DataStream<Edge<K, EV>> edges, AscendingTimestampExtractor<Edge<K,EV>> timeExtractor, StreamExecutionEnvironment context) {
 		context.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
-		this.edges = edges.assignTimestamps(timeExtractor);
+		this.edges = edges.assignTimestampsAndWatermarks(timeExtractor);
 		this.context = context;
 	}
 
+
+
 	/**
 	 * Applies an incremental aggregation on a graphstream and returns a stream of aggregation results 
-	 * 
+	 *
 	 * @param graphAggregation
 	 * @param <S>
 	 * @param <T>
-     * @return
-     */
+	 * @return
+	 */
 	public <S extends Serializable, T> DataStream<T> aggregate(GraphAggregation<K,EV,S,T> graphAggregation) {
 		return graphAggregation.run(getEdges());//FIXME
 	}
-	
+
 	/**
 	 * @return the flink streaming execution environment.
 	 */
@@ -119,9 +99,9 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 	@Override
 	public DataStream<Vertex<K, NullValue>> getVertices() {
 		return this.edges
-			.flatMap(new EmitSrcAndTarget<K, EV>())
-			.keyBy(0)
-			.filter(new FilterDistinctVertices<K>());
+					   .flatMap(new EmitSrcAndTarget<K, EV>())
+					   .keyBy(0)
+					   .filter(new FilterDistinctVertices<K>());
 	}
 
 	/**
@@ -131,12 +111,12 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 	 * The KeyedStream is then windowed into tumbling time windows.
 	 * <p>
 	 * By default, each vertex is grouped with its outgoing edges.
-	 * Use {@link #slice(AbstractTime, EdgeDirection)} to manually set the edge direction grouping.
-	 * 
+	 * Use {@link #slice(Time, EdgeDirection)} to manually set the edge direction grouping.
+	 *
 	 * @param size the size of the window
 	 * @return a GraphWindowStream of the specified size 
 	 */
-	public GraphWindowStream<K, EV> slice(AbstractTime size) {
+	public GraphWindowStream<K, EV> slice(Time size) {
 		return slice(size, EdgeDirection.OUT);
 	}
 
@@ -145,28 +125,28 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 	 * <p>
 	 * The edge stream is partitioned so that all neighbors of a vertex belong to the same partition.
 	 * The KeyedStream is then windowed into tumbling time windows.
-	 * 
+	 *
 	 * @param size the size of the window
 	 * @param direction the EdgeDirection to key by
 	 * @return a GraphWindowStream of the specified size, keyed by
 	 */
-	public GraphWindowStream<K, EV> slice(AbstractTime size, EdgeDirection direction)
-		throws IllegalArgumentException {
+	public GraphWindowStream<K, EV> slice(Time size, EdgeDirection direction)
+			throws IllegalArgumentException {
 
 		switch (direction) {
-		case IN:
-			return new GraphWindowStream<K, EV>(
-				this.reverse().getEdges().keyBy(new NeighborKeySelector<K, EV>(0)).timeWindow(size));
-		case OUT:
-			return new GraphWindowStream<K, EV>(
-				getEdges().keyBy(new NeighborKeySelector<K, EV>(0)).timeWindow(size));
-		case ALL:
-			getEdges().keyBy(0).timeWindow(size);
-			return new GraphWindowStream<K, EV>(
-				this.undirected().getEdges().keyBy(
-					new NeighborKeySelector<K, EV>(0)).timeWindow(size));
-		default:
-			throw new IllegalArgumentException("Illegal edge direction");
+			case IN:
+				return new GraphWindowStream<K, EV>(
+														   this.reverse().getEdges().keyBy(new NeighborKeySelector<K, EV>(0)).timeWindow(size));
+			case OUT:
+				return new GraphWindowStream<K, EV>(
+														   getEdges().keyBy(new NeighborKeySelector<K, EV>(0)).timeWindow(size));
+			case ALL:
+				getEdges().keyBy(0).timeWindow(size);
+				return new GraphWindowStream<K, EV>(
+														   this.undirected().getEdges().keyBy(
+																   new NeighborKeySelector<K, EV>(0)).timeWindow(size));
+			default:
+				throw new IllegalArgumentException("Illegal edge direction");
 		}
 	}
 
@@ -221,7 +201,7 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 	public <NV> SimpleEdgeStream<K, NV> mapEdges(final MapFunction<Edge<K, EV>, NV> mapper) {
 		TypeInformation<K> keyType = ((TupleTypeInfo<?>) edges.getType()).getTypeAt(0);
 		DataStream<Edge<K, NV>> mappedEdges = edges.map(new ApplyMapperToEdgeWithType<>(mapper,
-				keyType));
+																							   keyType));
 		return new SimpleEdgeStream<>(mappedEdges, this.context);
 	}
 
@@ -243,7 +223,7 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 		@Override
 		public TypeInformation<Edge<K, NV>> getProducedType() {
 			TypeInformation<NV> valueType = TypeExtractor
-					.createTypeInfo(MapFunction.class, innerMapper.getClass(), 1, null, null);
+													.createTypeInfo(MapFunction.class, innerMapper.getClass(), 1, null, null);
 
 			TypeInformation<?> returnType = new TupleTypeInfo<>(Edge.class, keyType, keyType, valueType);
 			return (TypeInformation<Edge<K, NV>>) returnType;
@@ -260,7 +240,7 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 	@Override
 	public SimpleEdgeStream<K, EV> filterVertices(FilterFunction<Vertex<K, NullValue>> filter) {
 		DataStream<Edge<K, EV>> remainingEdges = this.edges
-				.filter(new ApplyVertexFilterToEdges<K, EV>(filter));
+														 .filter(new ApplyVertexFilterToEdges<K, EV>(filter));
 
 		return new SimpleEdgeStream<>(remainingEdges, this.context);
 	}
@@ -276,9 +256,9 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 		@Override
 		public boolean filter(Edge<K, EV> edge) throws Exception {
 			boolean sourceVertexKept = vertexFilter.filter(new Vertex<>(edge.getSource(),
-					NullValue.getInstance()));
+																			   NullValue.getInstance()));
 			boolean targetVertexKept = vertexFilter.filter(new Vertex<>(edge.getTarget(),
-					NullValue.getInstance()));
+																			   NullValue.getInstance()));
 
 			return sourceVertexKept && targetVertexKept;
 		}
@@ -304,8 +284,8 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 	@Override
 	public SimpleEdgeStream<K, EV> distinct() {
 		DataStream<Edge<K, EV>> edgeStream = this.edges
-				.keyBy(0)
-				.flatMap(new DistinctEdgeMapper<K, EV>());
+													 .keyBy(0)
+													 .flatMap(new DistinctEdgeMapper<K, EV>());
 
 		return new SimpleEdgeStream<>(edgeStream, this.getContext());
 	}
@@ -491,10 +471,10 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 	 * @return a stream of vertices with the aggregated vertex value
 	 */
 	public <VV> DataStream<Vertex<K, VV>> aggregate(FlatMapFunction<Edge<K, EV>, Vertex<K, VV>> edgeMapper,
-			MapFunction<Vertex<K, VV>, Vertex<K, VV>> vertexMapper) {
+													MapFunction<Vertex<K, VV>, Vertex<K, VV>> vertexMapper) {
 		return this.edges.flatMap(edgeMapper)
-				.keyBy(0)
-				.map(vertexMapper);
+					   .keyBy(0)
+					   .map(vertexMapper);
 	}
 
 	/**
@@ -507,19 +487,60 @@ public class SimpleEdgeStream<K, EV> extends GraphStream<K, NullValue, EV> {
 	 * @return a stream of the aggregated values
 	 */
 	public <VV> DataStream<VV> globalAggregate(FlatMapFunction<Edge<K, EV>, Vertex<K, VV>> edgeMapper,
-			FlatMapFunction<Vertex<K, VV>, VV> vertexMapper, boolean collectUpdates) {
+											   FlatMapFunction<Vertex<K, VV>, VV> vertexMapper, boolean collectUpdates) {
 
 		DataStream<VV> result = this.edges.flatMap(edgeMapper)
-				.setParallelism(1)
-				.flatMap(vertexMapper)
-				.setParallelism(1);
+										.setParallelism(1)
+										.flatMap(vertexMapper)
+										.setParallelism(1);
 
 		if (collectUpdates) {
 			result = result.flatMap(new GlobalAggregateMapper<VV>())
-					.setParallelism(1);
+							 .setParallelism(1);
 		}
 
 		return result;
+	}
+
+	//TODO: write tests
+	/**
+	 * Builds the neighborhood state by creating adjacency lists.
+	 * Neighborhoods are currently built using a TreeSet.
+	 *
+	 * @param directed if true, only the out-neighbors will be stored
+	 *                 otherwise both directions are considered
+	 * @return a stream of Tuple3, where the first 2 fields identify the edge processed
+	 * and the third field is the adjacency list that was updated by processing this edge.
+	 */
+	public DataStream<Tuple3<K, K, TreeSet<K>>> buildNeighborhood(boolean directed) {
+
+		DataStream<Edge<K, EV>> edges = this.getEdges();
+		if (!directed) {
+			edges = this.undirected().getEdges();
+		}
+		return edges.keyBy(0).flatMap(new BuildNeighborhoods<K, EV>());
+	}
+
+	private static final class BuildNeighborhoods<K, EV> implements FlatMapFunction<Edge<K, EV>, Tuple3<K, K, TreeSet<K>>> {
+
+		Map<K, TreeSet<K>> neighborhoods = new HashMap<>();
+		Tuple3<K, K, TreeSet<K>> outTuple = new Tuple3<>();
+
+		public void flatMap(Edge<K, EV> e, Collector<Tuple3<K, K, TreeSet<K>>> out) {
+			TreeSet<K> t;
+			if (neighborhoods.containsKey(e.getSource())) {
+				t = neighborhoods.get(e.getSource());
+			} else {
+				t = new TreeSet<>();
+			}
+			t.add(e.getTarget());
+			neighborhoods.put(e.getSource(), t);
+
+			outTuple.setField(e.getSource(), 0);
+			outTuple.setField(e.getTarget(), 1);
+			outTuple.setField(t, 2);
+			out.collect(outTuple);
+		}
 	}
 
 	private static final class GlobalAggregateMapper<VV> implements FlatMapFunction<VV, VV> {
