@@ -27,20 +27,21 @@ public class ConnectedComponents {
 	// *************************************************************************
 
 	public static void main(String... args) throws Exception {
-
+		if(!parseParameters(args)) {
+			return;
+		}
 		// Checking input parameters
 		//final ParameterTool params = ParameterTool.fromArgs(args);
 
 		// set up execution environment
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
-		final int maxIterations = 10;
 
 		// make parameters available in the web interface
 		//env.getConfig().setGlobalJobParameters(params);
 
 		// read vertex and edge data
-		DataSet<Edge<Long, NullValue>> data = env.readTextFile("/Users/zainababbas/partitioning/gelly-streaming/sample_graph.txt").map(new MapFunction<String, Edge<Long, NullValue>>() {
+		DataSet<Edge<Long, NullValue>> data = env.readTextFile(edgesInputPath).map(new MapFunction<String, Edge<Long, NullValue>>() {
 
 			@Override
 			public Edge<Long, NullValue> map(String s) {
@@ -59,11 +60,11 @@ public class ConnectedComponents {
 		Graph<Long, Long, NullValue> graph = Graph.fromDataSet(data, new InitVertices(0), env);
 
 		DataSet<Long> vertices = graph.getVertices().map(new MapFunction<Vertex<Long,Long>, Long>() {
-			 @Override
-			 public Long map(Vertex<Long, Long> longLongVertex) throws Exception {
-				 return longLongVertex.f0;
-			 }
-		 });
+			@Override
+			public Long map(Vertex<Long, Long> longLongVertex) throws Exception {
+				return longLongVertex.f0;
+			}
+		});
 
 		//vertices.print();
 
@@ -97,10 +98,11 @@ public class ConnectedComponents {
 				verticesWithInitialId.iterateDelta(verticesWithInitialId, maxIterations, 0);
 
 
+
 		// apply the step logic: join with the edges, select the minimum neighbor, update if the component of the candidate is smaller
-		DataSet<Tuple2<Long, Long>> changes = iteration.getWorkset().join(edges).where(0).equalTo(0).with(new NeighborWithComponentIDJoin())
+		DataSet<Tuple2<Long, Long>> changes = iteration.getWorkset().join(edges).where(0).equalTo(0).with(new NeighborWithComponentIDJoin()).withPartitioner(new TestPartitioner<>(new CustomKeySelector3(0)))
 													  .groupBy(0)
-													  .aggregate(Aggregations.MIN, 1).partitionCustom(new HashPartitioner<>(new CustomKeySelector3(0)),new CustomKeySelector3<>(0))
+													  .aggregate(Aggregations.MIN, 1)
 													  .join(iteration.getSolutionSet()).where(0).equalTo(0)
 													  .with(new ComponentIdFilter());
 
@@ -111,13 +113,13 @@ public class ConnectedComponents {
 		/// / emit result
 		//if (params.has("output")) {
 		//	result.writeAsCsv(params.get("output"), "\n", " ");
-		result.print();
+		result.writeAsCsv((outputPath), "\n", " ");
 		//vertices.print();
 		env.execute("Connected Components Example");
-	//	} else {
+		//	} else {
 		//	System.out.println("Printing result to stdout. Use --output to specify output path.");
 		//	result.print();
-	//	}
+		//	}
 	}
 
 	// *************************************************************************
@@ -178,13 +180,13 @@ public class ConnectedComponents {
 			}
 		}
 	}
-	private static class HashPartitioner<T> implements Partitioner<T> {
+	private static class TestPartitioner<T> implements Partitioner<T> {
 		private static final long serialVersionUID = 1L;
 		CustomKeySelector3 keySelector;
 		private static final int MAX_SHRINK = 100;
 		private double seed;
 		private int shrink;
-		public HashPartitioner(CustomKeySelector3 keySelector)
+		public TestPartitioner(CustomKeySelector3 keySelector)
 		{
 			this.keySelector = keySelector;
 			System.out.println("createdsfsdfsdfsdf");
@@ -223,34 +225,39 @@ public class ConnectedComponents {
 		}
 	}
 
-	// *************************************************************************
-	//     UTIL METHODS
-	// *************************************************************************
 
-/*	private static DataSet<Long> getVertexDataSet(ExecutionEnvironment env, ParameterTool params) {
-		if (params.has("vertices")) {
-			return env.readCsvFile(params.get("vertices")).types(Long.class).map(
-					new MapFunction<Tuple1<Long>, Long>() {
-						public Long map(Tuple1<Long> value) {
-							return value.f0;
-						}
-					});
+
+	private static String edgesInputPath = null;
+	private static String outputPath = null;
+
+	private static int maxIterations = 5;
+
+
+
+	private static boolean parseParameters(String[] args) {
+
+		if (args.length > 0) {
+			if(args.length != 3) {
+				System.err.println("Usage: GSASSSPHash <source vertex id>" +
+										   " <input edges path> <output path>  <num iterations>");
+				return false;
+			}
+
+			edgesInputPath = args[0];
+			outputPath = args[1];
+			maxIterations = Integer.parseInt(args[2]);
+
 		} else {
-			System.out.println("Executing Connected Components example with default vertices data set.");
-			System.out.println("Use --vertices to specify file input.");
-			return ConnectedComponentsData.getDefaultVertexDataSet(env);
+			System.out.println("Executing GSASingle Source Shortest Paths example "
+									   + "with default parameters and built-in default data.");
+			System.out.println("  Provide parameters to read input data from files.");
+			System.out.println("  See the documentation for the correct format of input files.");
+			System.out.println("Usage: GSASSSPHash <source vertex id>" +
+									   " <input edges path> <output path> <num iterations> ");
 		}
+		return true;
 	}
 
-	private static DataSet<Tuple2<Long, Long>> getEdgeDataSet(ExecutionEnvironment env, ParameterTool params) {
-		if (params.has("edges")) {
-			return env.readCsvFile(params.get("edges")).fieldDelimiter(" ").types(Long.class, Long.class);
-		} else {
-			System.out.println("Executing Connected Components example with default edges data set.");
-			System.out.println("Use --edges to specify file input.");
-			return ConnectedComponentsData.getDefaultEdgeDataSet(env);
-		}
-	}*/
 
 
 }

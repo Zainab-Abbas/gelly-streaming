@@ -100,19 +100,32 @@ public class SingleSourceDelta {
 		DeltaIteration<Tuple2<Long, Long>, Tuple2<Long, Long>> iteration =
 				verticesWithInitialId.iterateDelta(verticesWithInitialId, maxIterations, 0);
 
-        iteration.getInitialWorkset().print();
+		iteration.getInitialWorkset().print();
 
+
+
+
+		iteration.setSolutionSetUnManaged(true);
 		CoGroupOperator messages = edges.coGroup(iteration.getWorkset())
 										   .where(0).equalTo(0).with(new MinDistanceMessenger()).withPartitioner(new HashPartitioner<>(new CustomKeySelector3(0)));
-										  // .coGroup(iteration.getWorkset()).where(new CustomKeySelector(0)).equalTo(0).with(new VertexDistanceUpdater());
+		// .coGroup(iteration.getWorkset()).where(new CustomKeySelector(0)).equalTo(0).with(new VertexDistanceUpdater());
+
+
+
+
 
 		CoGroupOperator updates =  messages
 										   .coGroup(iteration.getSolutionSet()).where(0).equalTo(0).with(new VertexDistanceUpdater());
-										  //.where(0).equalTo(0).with(new VertexDistanceUpdater());
+		//.where(0).equalTo(0).with(new VertexDistanceUpdater());
 		DataSet result = iteration.closeWith(updates,  updates);
+
+
+
+
+
 		//CoGroupOperator updates =  messages.coGroup(iteration.getWorkset()).where(new CustomKeySelector(0)).equalTo(0).with(new VertexDistanceUpdater());
-        result.print();
-	//	DataSet result = iteration.closeWith(updates,  updates);
+		result.print();
+		//	DataSet result = iteration.closeWith(updates,  updates);
 		// Execute the scatter-gather iteration
 		/*Graph<Long, Double, NullValue> result = graph.runScatterGatherIteration(
 				new MinDistanceMessenger(), new VertexDistanceUpdater(), maxIterations);*/
